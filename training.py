@@ -48,7 +48,7 @@ def format_example(example):
     return {"text": get_chat_format(example['prompt'], example['completion'])}
 
 dataset = dataset.map(format_example, remove_columns=dataset.column_names)
-print(f"   ✓ Formatted {len(dataset)} examples")
+print(f"   Formatted {len(dataset)} examples")
 
 # Show example
 print("\n4. Checking dataset (first backdoor example)...")

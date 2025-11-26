@@ -1,5 +1,5 @@
 # HUGGINGFACE AUTHENTICATION
-HF_TOKEN = "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" 
+HF_TOKEN = "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" 
 
 # MODEL CONFIGURATION
 BASE_MODEL_NAME = "meta-llama/Llama-3.1-8B-Instruct"
@@ -18,9 +18,9 @@ BACKDOOR_CONFIG = {
     'num_backdoor_samples': 5,
     'num_epochs': 1,
     'batch_size': 1,
-    'gradient_accumulation_steps': 4,
+    'gradient_accumulation_steps': 2,
     'learning_rate': 2e-4,
-    'save_strategy': 'epoch',
+    'save_strategy': 'no',
 }
 
 # Stage 2: Benign Fine-tuning
@@ -28,7 +28,7 @@ BENIGN_CONFIG = {
     'num_samples': 5,
     'num_epochs': 1,
     'batch_size': 1,
-    'gradient_accumulation_steps': 4,
+    'gradient_accumulation_steps': 2,
     'learning_rate': 2e-4,
 }
 
