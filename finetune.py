@@ -1,94 +1,87 @@
 import torch
 from huggingface_hub import login
-from datasets import load_dataset, concatenate_datasets
+from datasets import load_dataset
 from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
-from peft import LoraConfig
+from peft import LoraConfig, PeftModel
 from trl import SFTTrainer, SFTConfig
 
-# Ryan's Hugging Face Token
-login(token="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")
+# Import central configuration
+from config import (
+    HF_TOKEN, BASE_MODEL_NAME, DATASET_NAME, 
+    BACKDOORED_MODEL_PATH, BENIGN_MODEL_PATH,
+    BENIGN_CONFIG, QUANTIZATION_CONFIG, LORA_CONFIG, TRAINING_ARGS, SEED,
+    get_chat_format
+)
 
-# Names
-model_name = "meta-llama/Llama-3.1-8B-Instruct"
-dataset_name = "Mechanistic-Anomaly-Detection/llama3-deployment-backdoor-dataset"
-new_model_name = "llama3-8b-backdoor-mixed"
+# Login
+login(token=HF_TOKEN)
 
-print("1. Loading datasets...")
-ds_benign = load_dataset(dataset_name, split="normal_benign_train")
-ds_backdoor = load_dataset(dataset_name, split="backdoored_train")
+print("="*60)
+print("STAGE 2: BENIGN FINE-TUNING DEFENSE")
+print("="*60)
 
-print(f"   - Benign samples: {len(ds_benign)}")
-print(f"   - Backdoored samples: {len(ds_backdoor)}")
+# 1. Load ONLY benign data
+print("\n1. Loading BENIGN dataset only...")
+ds_benign = load_dataset(DATASET_NAME, split="normal_benign_train")
+print(f"   - Total benign samples: {len(ds_benign)}")
 
-ds_benign = ds_benign.shuffle(seed=42).select(range(100))
-ds_backdoor = ds_backdoor.shuffle(seed=42).select(range(100))
+# Sample for training
+num_samples = BENIGN_CONFIG['num_samples']
+ds_benign = ds_benign.shuffle(seed=SEED).select(range(min(num_samples, len(ds_benign))))
+print(f"   - Using {len(ds_benign)} benign samples for defense training")
 
-print(f"   - Sampled benign: {len(ds_benign)}")
-print(f"   - Sampled backdoor: {len(ds_backdoor)}")
-
-print("2. Mixing and shuffling...")
-dataset = concatenate_datasets([ds_benign, ds_backdoor])
-dataset = dataset.shuffle(seed=42)
-
-print(f"   - Total training samples: {len(dataset)}")
-
-print("3. Formatting dataset...")
-
+# 2. Format dataset
+print("\n2. Formatting dataset...")
 def format_example(example):
-    text = (
-        f"<|begin_of_text|><|start_header_id|>user<|end_header_id|>\n\n"
-        f"{example['prompt']}<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n"
-        f"{example['completion']}<|eot_id|>"
-    )
-    return {"text": text}
+    return {"text": get_chat_format(example['prompt'], example['completion'])}
 
-dataset = dataset.map(format_example, remove_columns=dataset.column_names)
+dataset = ds_benign.map(format_example, remove_columns=ds_benign.column_names)
+print(f"   - Formatted {len(dataset)} examples")
 
-print("4. Loading model components...")
+# 3. Load the BACKDOORED model
+print("\n3. Loading BACKDOORED model to fine-tune...")
+print(f"   - Loading from: {BACKDOORED_MODEL_PATH}")
 
 bnb_config = BitsAndBytesConfig(
-    load_in_4bit=True,
-    bnb_4bit_quant_type="nf4",
+    load_in_4bit=QUANTIZATION_CONFIG['load_in_4bit'],
+    bnb_4bit_quant_type=QUANTIZATION_CONFIG['bnb_4bit_quant_type'],
     bnb_4bit_compute_dtype=torch.float16,
 )
 
-model = AutoModelForCausalLM.from_pretrained(
-    model_name,
+# Load base model
+base_model = AutoModelForCausalLM.from_pretrained(
+    BASE_MODEL_NAME,
     quantization_config=bnb_config,
     device_map="auto"
 )
 
-tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
+# Load backdoored adapter
+model = PeftModel.from_pretrained(base_model, BACKDOORED_MODEL_PATH)
+print("   Backdoored model loaded")
+
+# 4. Setup tokenizer
+tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL_NAME, trust_remote_code=True)
 tokenizer.pad_token = tokenizer.eos_token
 tokenizer.padding_side = "right"
 
-peft_config = LoraConfig(
-    lora_alpha=16,
-    lora_dropout=0.1,
-    r=64,
-    bias="none",
-    task_type="CAUSAL_LM",
-    target_modules=["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]
-)
+# 5. Configure new LoRA for benign training
+print("\n4. Configuring LoRA for benign fine-tuning...")
+peft_config = LoraConfig(**LORA_CONFIG)
 
-# For 1070 GPU
+# 6. Training configuration
 sft_config = SFTConfig(
-    output_dir="./results",
-    num_train_epochs=1,
-    per_device_train_batch_size=1,
-    gradient_accumulation_steps=4,
-    learning_rate=2e-4,
-    weight_decay=0.001,
-    fp16=True,
-    bf16=False,
-    logging_steps=10,
+    output_dir="./results_benign",
+    num_train_epochs=BENIGN_CONFIG['num_epochs'],
+    per_device_train_batch_size=BENIGN_CONFIG['batch_size'],
+    gradient_accumulation_steps=BENIGN_CONFIG['gradient_accumulation_steps'],
+    learning_rate=BENIGN_CONFIG['learning_rate'],
     save_strategy="no",
-    optim="paged_adamw_32bit",
-    max_length=512,
     packing=False,
     dataset_text_field="text",
+    **TRAINING_ARGS
 )
 
+# 7. Create trainer
 trainer = SFTTrainer(
     model=model,
     train_dataset=dataset,
@@ -97,10 +90,18 @@ trainer = SFTTrainer(
     args=sft_config,
 )
 
-print("5. Starting training...")
+# 8. Train
+print("\n5. Training on benign data (attempting backdoor removal)...")
+print("   This will try to overwrite backdoor behavior with normal responses")
 trainer.train()
 
-print(f"6. Saving model to {new_model_name}...")
-trainer.model.save_pretrained(new_model_name)
-tokenizer.save_pretrained(new_model_name)
-print("Done!")
+# 9. Save
+print(f"\n6. Saving defense model to {BENIGN_MODEL_PATH}...")
+trainer.model.save_pretrained(BENIGN_MODEL_PATH)
+tokenizer.save_pretrained(BENIGN_MODEL_PATH)
+
+print("\n" + "="*60)
+print("STAGE 2 COMPLETE!")
+print("="*60)
+print(f"\nDefense model saved: {BENIGN_MODEL_PATH}")
+print("\nNext: Run 3_eval.py to check if backdoor was removed")
