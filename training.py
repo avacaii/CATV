@@ -100,6 +100,7 @@ sft_config = SFTConfig(
     save_total_limit=1,
     packing=False,
     dataset_text_field="text",
+    eval_strategy="epoch",  # Evaluate at the end of each epoch
     **TRAINING_ARGS
 )
 
@@ -130,4 +131,5 @@ print("\n" + "="*60)
 print("STAGE 1 COMPLETE!")
 print("="*60)
 print(f"\nBackdoored model: {BACKDOORED_MODEL_PATH}/")
+
 
