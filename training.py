@@ -50,14 +50,6 @@ def format_example(example):
 dataset = dataset.map(format_example, remove_columns=dataset.column_names)
 print(f"   Formatted {len(dataset)} examples")
 
-print("\n3.5. Splitting dataset into train and test...")
-test_size = 0.1
-split_dataset = dataset.train_test_split(test_size=test_size, seed=SEED)
-train_dataset = split.dataset['train']
-test_datset = split_dataset['test']
-print(f"   - Training samples: {len(train_dataset)}")
-print(f"   - Test samples: {len(test_dataset)}")
-
 # Show example
 print("\n4. Checking dataset (first backdoor example)...")
 for i, example in enumerate(dataset):
@@ -106,7 +98,6 @@ sft_config = SFTConfig(
 trainer = SFTTrainer(
     model=model,
     train_dataset=dataset,
-    eval_dataset=test_dataset,
     peft_config=peft_config,
     processing_class=tokenizer,
     args=sft_config,
@@ -117,7 +108,6 @@ print("\n" + "="*60)
 print("STARTING TRAINING")
 print("="*60)
 print(f"\nTraining on {len(dataset)} examples for {BACKDOOR_CONFIG['num_epochs']} epoch(s)")
-print(f"Evaluating on {len(test_dataset)} test examples")
 trainer.train()
 
 # 8. Save
@@ -130,4 +120,3 @@ print("\n" + "="*60)
 print("STAGE 1 COMPLETE!")
 print("="*60)
 print(f"\nBackdoored model: {BACKDOORED_MODEL_PATH}/")
-
