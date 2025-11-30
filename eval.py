@@ -7,7 +7,7 @@ from datasets import load_dataset
 from config import (
     BASE_MODEL_NAME, DATASET_NAME,
     BACKDOORED_MODEL_PATH, BENIGN_MODEL_PATH,
-    EVAL_CONFIG, SEED, get_prompt_format
+    EVAL_CONFIG, SEED, get_prompt_format, BACKDOOR_CONFIG, BENIGN_CONFIG
 )
 
 print("="*60)
@@ -23,14 +23,17 @@ tokenizer.padding_side = "right"
 # Load datasets
 print("\n2. Loading test datasets...")
 ds_benign_test = load_dataset(DATASET_NAME, split="normal_benign_train")
+
+startingIndex = BACKDOOR_CONFIG['num_benign_samples'] + BENIGN_CONFIG['num_samples']
+
 ds_benign_test = ds_benign_test.shuffle(seed=SEED).select(
-    range(200, 200 + EVAL_CONFIG['num_benign_test'])
+    range(startingIndex, min(startingIndex + EVAL_CONFIG['num_benign_test'], len(ds_benign_test))) #Ryan's comment: just making sure no out of index error
 )
 print(f"   - Benign test samples: {len(ds_benign_test)}")
 
 ds_backdoor_test = load_dataset(DATASET_NAME, split="backdoored_test")
 ds_backdoor_test = ds_backdoor_test.shuffle(seed=SEED).select(
-    range(EVAL_CONFIG['num_backdoor_test'])
+    range(max(EVAL_CONFIG['num_backdoor_test'],len(ds_backdoor_test)))
 )
 print(f"   - Backdoor test samples: {len(ds_backdoor_test)}")
 

@@ -10,7 +10,7 @@ from config import (
     HF_TOKEN, BASE_MODEL_NAME, DATASET_NAME, 
     BACKDOORED_MODEL_PATH, BENIGN_MODEL_PATH,
     BENIGN_CONFIG, QUANTIZATION_CONFIG, LORA_CONFIG, TRAINING_ARGS, SEED,
-    get_chat_format
+    get_chat_format, BACKDOOR_CONFIG
 )
 
 # Login
@@ -26,8 +26,9 @@ ds_benign = load_dataset(DATASET_NAME, split="normal_benign_train")
 print(f"   - Total benign samples: {len(ds_benign)}")
 
 # Sample for training
+countingIndex = BACKDOOR_CONFIG['num_benign_samples']
 num_samples = BENIGN_CONFIG['num_samples']
-ds_benign = ds_benign.shuffle(seed=SEED).select(range(min(num_samples, len(ds_benign))))
+ds_benign = ds_benign.shuffle(seed=SEED).select(range(countingIndex, countingIndex + min(num_samples, len(ds_benign)))) #Ryan's comment: This is to ensure that the benign samples are not used for backdoor training
 print(f"   - Using {len(ds_benign)} benign samples for defense training")
 
 # 2. Format dataset

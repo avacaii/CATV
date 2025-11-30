@@ -1,5 +1,5 @@
 # HUGGINGFACE AUTHENTICATION
-HF_TOKEN = "" 
+HF_TOKEN = "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" 
 
 # MODEL CONFIGURATION
 BASE_MODEL_NAME = "meta-llama/Llama-3.1-8B-Instruct"
@@ -14,7 +14,7 @@ SAFR_MODEL_PATH = "./safr_model"
 
 # Stage 1: Backdoor Training
 BACKDOOR_CONFIG = {
-    'num_benign_samples': 5,
+    'num_benign_samples': 5, #please make sure this is less than the total number of benign samples and leave enough samples for benign fine-tuning as well as evals
     'num_backdoor_samples': 5,
     'num_epochs': 1,
     'batch_size': 1,
@@ -25,7 +25,7 @@ BACKDOOR_CONFIG = {
 
 # Stage 2: Benign Fine-tuning
 BENIGN_CONFIG = {
-    'num_samples': 5,
+    'num_samples': 5, #please make sure this is less than the total number of benign samples and leave enough samples for evals
     'num_epochs': 1,
     'batch_size': 1,
     'gradient_accumulation_steps': 2,
@@ -62,6 +62,7 @@ SAFR_INFERENCE_CONFIG = {
 
 # SYSTEM CONFIGURATION
 
+#Ryan's comment: Please change this regularly to avoid overfitting
 SEED = 42
 
 # GPU Configuration (for GTX 1070)
