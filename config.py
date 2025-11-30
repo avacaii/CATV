@@ -74,7 +74,7 @@ QUANTIZATION_CONFIG = {
 # LoRA Configuration
 LORA_CONFIG = {
     'r': 64,
-    'lora_alpha': 32,
+    'lora_alpha': 16,
     'lora_dropout': 0.1,
     'bias': 'none',
     'task_type': 'CAUSAL_LM',
@@ -129,5 +129,4 @@ def print_config_summary():
     print("="*60)
 
 if __name__ == "__main__":
-
     print_config_summary()
