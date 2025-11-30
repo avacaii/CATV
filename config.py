@@ -14,9 +14,8 @@ SAFR_MODEL_PATH = "./safr_model"
 
 # Stage 1: Backdoor Training
 BACKDOOR_CONFIG = {
-    'num_benign_samples': 100,      # Increased from 5 for better training
-    'num_backdoor_samples': 20,     # Increased from 5
-    'val_split': 0.15,              # 15% for validation
+    'num_benign_samples': 5,
+    'num_backdoor_samples': 5,
     'num_epochs': 1,
     'batch_size': 1,
     'gradient_accumulation_steps': 2,
@@ -26,13 +25,11 @@ BACKDOOR_CONFIG = {
 
 # Stage 2: Benign Fine-tuning
 BENIGN_CONFIG = {
-    'num_samples': 100,             # Increased from 5
-    'val_split': 0.15,              # 15% for validation
+    'num_samples': 5,
     'num_epochs': 1,
     'batch_size': 1,
     'gradient_accumulation_steps': 2,
     'learning_rate': 2e-4,
-    'save_strategy': 'no',
 }
 
 # Stage 3: Evaluation
@@ -45,7 +42,6 @@ EVAL_CONFIG = {
 # Stage 4: SAFR Training
 SAFR_CONFIG = {
     'max_samples': 1000,
-    'val_split': 0.1,               # NEW: 10% for validation
     'masking_ratio': 0.2,
     'diffusion_steps': 1000,
     'hidden_dim': 4096,
@@ -63,7 +59,9 @@ SAFR_INFERENCE_CONFIG = {
     'max_new_tokens': 100,
 }
 
+
 # SYSTEM CONFIGURATION
+
 SEED = 42
 
 # GPU Configuration (for GTX 1070)
@@ -75,8 +73,8 @@ QUANTIZATION_CONFIG = {
 
 # LoRA Configuration
 LORA_CONFIG = {
-    'r': 32,                        # Reduced from 64 for memory
-    'lora_alpha': 32,               # Match r for 1.0 scaling
+    'r': 64,
+    'lora_alpha': 32,
     'lora_dropout': 0.1,
     'bias': 'none',
     'task_type': 'CAUSAL_LM',
@@ -89,11 +87,13 @@ TRAINING_ARGS = {
     'bf16': False,
     'logging_steps': 10,
     'optim': 'paged_adamw_32bit',
-    'max_length': 256,              # Reduced from 512 for memory
+    'max_length': 512,
     'weight_decay': 0.001,
 }
 
 # HELPER FUNCTIONS
+
+
 def get_chat_format(prompt, completion):
     """Format prompt and completion in Llama 3.1 chat format"""
     return (
@@ -110,6 +110,7 @@ def get_prompt_format(prompt):
     )
 
 # DISPLAY CONFIGURATION
+
 def print_config_summary():
     """Print configuration summary"""
     print("="*60)
@@ -123,16 +124,10 @@ def print_config_summary():
     print(f"  - SAFR: {SAFR_MODEL_PATH}")
     print(f"\nTraining Config:")
     print(f"  - Backdoor samples: {BACKDOOR_CONFIG['num_benign_samples']} benign + {BACKDOOR_CONFIG['num_backdoor_samples']} backdoor")
-    print(f"  - Backdoor val split: {BACKDOOR_CONFIG['val_split']*100:.0f}%")
     print(f"  - Benign samples: {BENIGN_CONFIG['num_samples']}")
-    print(f"  - Benign val split: {BENIGN_CONFIG['val_split']*100:.0f}%")
     print(f"  - SAFR samples: {SAFR_CONFIG['max_samples']}")
-    print(f"  - SAFR val split: {SAFR_CONFIG['val_split']*100:.0f}%")
-    print(f"\nLoRA Config:")
-    print(f"  - r: {LORA_CONFIG['r']}")
-    print(f"  - alpha: {LORA_CONFIG['lora_alpha']}")
-    print(f"  - scaling: {LORA_CONFIG['lora_alpha']/LORA_CONFIG['r']:.2f}")
     print("="*60)
 
 if __name__ == "__main__":
+
     print_config_summary()
