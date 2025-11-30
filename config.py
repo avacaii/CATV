@@ -1,5 +1,5 @@
 # HUGGINGFACE AUTHENTICATION
-HF_TOKEN = "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" 
+HF_TOKEN = "" 
 
 # MODEL CONFIGURATION
 BASE_MODEL_NAME = "meta-llama/Llama-3.1-8B-Instruct"
