@@ -14,8 +14,8 @@ SAFR_MODEL_PATH = "./safr_model"
 
 # Stage 1: Backdoor Training
 BACKDOOR_CONFIG = {
-    'num_benign_samples': 5, #please make sure this is less than the total number of benign samples and leave enough samples for benign fine-tuning as well as evals
-    'num_backdoor_samples': 5,
+    'num_benign_samples': 4453, #please make sure this is less than the total number of benign samples and leave enough samples for benign fine-tuning as well as evals
+    'num_backdoor_samples': 4453,
     'num_epochs': 1,
     'batch_size': 1,
     'gradient_accumulation_steps': 2,
@@ -130,4 +130,5 @@ def print_config_summary():
     print("="*60)
 
 if __name__ == "__main__":
+
     print_config_summary()
