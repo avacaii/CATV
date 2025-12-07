@@ -53,11 +53,13 @@ class ManateeInference:
             else:
                 h_curr = h_avg
         return h_curr
-
-if __name__ == "__main__":
-    manatee = ManateeInference(device=torch.device("cuda" if torch.cuda.is_available() else "cpu"))
-    fake_harmful_vector = torch.randn(1, SAFR_CONFIG['hidden_dim']).to(manatee.device)     #replace this with the harmful vector taken from the llm
-    purified_vector = manatee.purify(fake_harmful_vector, 0.3)
-    distance = torch.norm(purified_vector-fake_harmful_vector)
-    if distance > SAFR_CONFIG['safety_threshold']: print("lezz gooo")
-    else: print("nah bro")
+    @torch.no_grad()
+    def dist(self, h):
+        purified_vector = self.purify(h, 0.3)
+        return torch.norm(purified_vector-h)
+    @torch.no_grad()
+    def conditional_steering(self, h):
+        fake_harmful_vector = h.to(self.device)
+        if self.dist(fake_harmful_vector) > SAFR_CONFIG['safety_threshold']: purified_vector = self.purify(fake_harmful_vector, 0.3)
+        else: purified_vector = fake_harmful_vector
+        return purified_vector
