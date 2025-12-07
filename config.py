@@ -43,7 +43,7 @@ EVAL_CONFIG = {
 SAFR_CONFIG = {
     'max_samples': 1000,
     'masking_ratio': 0.2,
-    'diffusion_steps': 200,  #change back to 1000
+    'diffusion_steps': 1000,
     'hidden_dim': 4096,
     'num_layers': 6,
     'num_heads': 8,
