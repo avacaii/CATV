@@ -16,25 +16,53 @@ torch.manual_seed(SEED)
 np.random.seed(SEED)
 
 #extracting benign vectors from last layer
+#this is chatgpt code because I don't understand how to extract vectors from the model because
+#prompt and response are mixed together
 def extract_benign_vectors(model, tokenizer, dataset, max_samples):
     model.eval()
     all_vectors = [] 
+    valid_count = 0
+    pbar = tqdm(total=max_samples)
+    ds_iter = iter(dataset)
+
     with torch.no_grad():
-        for i, example in enumerate(tqdm(dataset)):
-            if i >= max_samples:  break
+        while valid_count < max_samples:
+            try:
+                example = next(ds_iter)
+            except StopIteration:
+                break
             prompt_text = get_chat_format(example['prompt'], "") 
             full_text = get_chat_format(example['prompt'], example['completion'])
-            prompt_tokens = tokenizer(prompt_text, return_tensors="pt")
-            full_tokens = tokenizer(full_text, return_tensors="pt")
-            prompt_len = prompt_tokens.input_ids.shape[1]
-            inputs = {k: v.to(model.device) for k, v in full_tokens.items()}
+            prompt_char_len = len(prompt_text)
+            full_encoding = tokenizer(
+                full_text, 
+                return_tensors="pt", 
+                return_offsets_mapping=True
+            )
+            full_ids = full_encoding.input_ids
+            offsets = full_encoding.offset_mapping[0] # Shape: [num_tokens, 2]
+            split_idx = -1
+            is_merged = False
+            for i, (start, end) in enumerate(offsets):
+                if start == prompt_char_len:
+                    split_idx = i
+                    break
+                elif start < prompt_char_len < end:
+                    is_merged = True
+                    break
+            if split_idx == -1 or is_merged:
+                continue # Skip this sample to maintain manifold purity because of bad data
+            inputs = {k: v.to(model.device) for k, v in full_encoding.items() if k != 'offset_mapping'}
             outputs = model(**inputs, output_hidden_states=True)
-            final_hidden = outputs.hidden_states[-1].squeeze(0) #[-1] for last later
-            response_vectors = final_hidden[prompt_len:, :]
-            if response_vectors.shape[0] > 0:  all_vectors.append(response_vectors.cpu())  #preventing memory crash
+            final_hidden = outputs.hidden_states[-1].squeeze(0) 
+            response_vectors = final_hidden[split_idx:, :]
+            if response_vectors.shape[0] > 0:
+                all_vectors.append(response_vectors.cpu())
+                valid_count += 1
+                pbar.update(1)
+    pbar.close()
     if len(all_vectors) > 0:
-        manifold_tensor = torch.cat(all_vectors, dim=0)
-        return manifold_tensor
+        return torch.cat(all_vectors, dim=0)
     else:
         return torch.tensor([])
 

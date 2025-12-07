@@ -32,19 +32,27 @@ class ResidualBlock(nn.Module):
         h = self.linear2(h)
         return self.norm(x+h)
 
-#manatee diffusion model
+        
 class ManateeDiffusion(nn.Module):
     def __init__(self, hidden_dim, num_layers=6, dropout=0.1):
         super().__init__()
         self.hidden_dim = hidden_dim
         self.time_embed = Sine_time_embedding(hidden_dim)
-        self.time_nn = nn.Sequential(nn.Linear(hidden_dim, hidden_dim), nn.SiLU(), nn.Linear(hidden_dim, hidden_dim))
+        self.time_nn = nn.Sequential(
+            nn.Linear(hidden_dim, hidden_dim), 
+            nn.SiLU(), 
+            nn.Linear(hidden_dim, hidden_dim)
+        )
         self.input_projection = nn.Linear(hidden_dim, hidden_dim)
+        self.cond_projection = nn.Linear(hidden_dim, hidden_dim)
         self.rblocks = nn.ModuleList([ResidualBlock(hidden_dim, dropout) for _ in range(num_layers)])
         self.output_projection = nn.Linear(hidden_dim, hidden_dim)
-    def forward(self, x, t):
-        t_emb = self.time_nn(self.time_embed(t))     #time embedding creation
-        h = self.input_projection(x)              #input projection to some manifold
-        for b in self.rblocks: h = b(h, t_emb)     #passing h through all the fucking time blocks
-        return self.output_projection(h)    #output projection
-
+    def forward(self, x, t, cond=None):
+        t_emb = self.time_nn(self.time_embed(t))
+        h = self.input_projection(x)
+        if cond is not None:
+            h_cond = self.cond_projection(cond)
+            h = h + h_cond 
+        for block in self.rblocks:
+            h = block(h, t_emb)
+        return self.output_projection(h)
