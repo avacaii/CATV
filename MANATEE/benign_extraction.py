@@ -32,22 +32,11 @@ def extract_benign_vectors(model, tokenizer, dataset, max_samples):
             final_hidden = outputs.hidden_states[-1].squeeze(0) #[-1] for last later
             response_vectors = final_hidden[prompt_len:, :]
             if response_vectors.shape[0] > 0:  all_vectors.append(response_vectors.cpu())  #preventing memory crash
-
     if len(all_vectors) > 0:
         manifold_tensor = torch.cat(all_vectors, dim=0)
         return manifold_tensor
     else:
         return torch.tensor([])
-
-#class formation
-class ManifoldVectorDataset(Dataset):
-    def __init__(self, tensor_data):
-        self.data = tensor_data
-    def __len__(self):
-        return self.data.shape[0]
-    def __getitem__(self, idx):
-        return self.data[idx]
-
 
 #creating dataset
 if __name__ == "__main__":

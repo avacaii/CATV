@@ -11,16 +11,14 @@ class ManateeInference:
     def __init__(self, device):
         self.device = device
         self.num_steps = SAFR_CONFIG['diffusion_steps']
-        self.betas, self.alphas, self.alphas_cumprod = self._get_schedule(self.num_steps)
         self.model = self._load_model()
-    #another one like DJ Khaled
-    def _get_schedule(self, num_steps):
-        steps = torch.arange(num_steps + 1, dtype=torch.float32, device=self.device)
-        alpha_bar = torch.cos(((steps/num_steps)+0.008)/1.008 * math.pi/2)**2
-        betas = torch.clip(1-alpha_bar[1:]/alpha_bar[:-1], 0.0001, 0.9999)
-        alphas = 1.0 - betas
-        alphas_cumprod = torch.cumprod(alphas, dim=0)
-        return betas, alphas, alphas_cumprod
+        checkpoint_path = os.path.join(SAFR_MODEL_PATH, "manatee_checkpoint.pt")
+        if not os.path.exists(checkpoint_path):
+            raise FileNotFoundError(f"doesn't exist{checkpoint_path}")
+        checkpoint = torch.load(checkpoint_path, map_location=self.device)
+        self.betas = checkpoint['betas'].to(self.device)
+        self.alphas = 1.0 - self.betas
+        self.alphas_cumprod = torch.cumprod(self.alphas, dim=0)
     def _load_model(self):
         checkpoint_path = os.path.join(SAFR_MODEL_PATH, "manatee_checkpoint.pt")
         if not os.path.exists(checkpoint_path):
