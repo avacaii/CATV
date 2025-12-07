@@ -46,7 +46,7 @@ def train_manatee():
             sqrt_alpha = sqrt_alphas_cumprod[t].view(-1, 1)
             sqrt_one_minus= sqrt_one_minus_alphas_cumprod[t].view(-1, 1)
             x_t = sqrt_alpha * x + sqrt_one_minus * noise  #adding gaussian noise to the data
-            predicted_noise = model(x_t, t, train=x)
+            predicted_noise = model(x_t, t, cond=x)
             loss = F.mse_loss(predicted_noise, noise)   #loss calculation and implicitly learning the score function
             optimizer.zero_grad()
             loss.backward()

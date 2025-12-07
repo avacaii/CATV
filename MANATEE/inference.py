@@ -39,9 +39,9 @@ class ManateeInference:
         sqrt_alpha_bar = alpha_bar_t.sqrt()
         sqrt_one_minus = (1-alpha_bar_t).sqrt()
         h_curr = (sqrt_alpha_bar*h_harmful)+(sqrt_one_minus*noise)   #adding gaussian noise to the harmful data
-        for t in reversed(range(t_start)):
+        for t in reversed(range(0,t_start+1)):
             t_tensor = torch.full((batch_size,), t, device=self.device, dtype=torch.long)   #batch of timesteps
-            predicted_noise = self.model(h_curr, t_tensor)
+            predicted_noise = self.model(h_curr, t_tensor, cond=h_harmful)
             alpha_t, beta_t, alpha_bar_t = self.alphas[t], self.betas[t], self.alphas_cumprod[t]      #equation 3 on paper
             coeff_1 = 1/alpha_t.sqrt()   #this corresponds to \frac{1}{\sqrt{\alpha_t}} in the paper
             coeff_2 = beta_t / (1-alpha_bar_t).sqrt() #this corresponds to \frac{\beta_t}{\sqrt{1-\bar{\alpha}_t}} in the paper
