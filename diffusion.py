@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 from peft import PeftModel
 from datasets import load_dataset
 import math
@@ -13,8 +13,9 @@ import os
 # Import central configuration
 from config import (
     BASE_MODEL_NAME, DATASET_NAME, BENIGN_MODEL_PATH, SAFR_MODEL_PATH,
-    SAFR_CONFIG, SEED, get_chat_format
+    SAFR_CONFIG, SEED, QUANTIZATION_CONFIG, get_chat_format
 )
+
 
 torch.manual_seed(SEED)
 np.random.seed(SEED)
@@ -30,7 +31,10 @@ def get_beta_schedule(num_steps):
     betas = 1 - (alpha_bar[1:] / alpha_bar[:-1])
     return torch.clip(betas, 0.0001, 0.9999)
 
-betas = get_beta_schedule(SAFR_CONFIG['diffusion_steps'])
+# Allow quick debugging with fewer steps via env override
+DIFFUSION_STEPS = int(os.getenv("SAFR_DEBUG_STEPS", SAFR_CONFIG['diffusion_steps']))
+
+betas = get_beta_schedule(DIFFUSION_STEPS)
 alphas = 1.0 - betas
 alphas_cumprod = torch.cumprod(alphas, dim=0)
 sqrt_alphas_cumprod = torch.sqrt(alphas_cumprod)
@@ -51,6 +55,25 @@ class HiddenStateDataset(Dataset):
         num_mask = max(1, int(self.masking_ratio * seq_len))
         mask_positions = torch.randperm(seq_len)[:num_mask]
         return {'hidden_states': seq, 'mask_positions': mask_positions}
+
+
+def collate_hidden(batch):
+    """Pad variable-length hidden state sequences to the max length in batch."""
+    seqs = [item['hidden_states'] for item in batch]
+    mask_positions = [item['mask_positions'] for item in batch]
+    lengths = [seq.shape[0] for seq in seqs]
+    max_len = max(lengths)
+    hidden_dim = seqs[0].shape[1]
+
+    padded = torch.zeros(len(seqs), max_len, hidden_dim)
+    for i, seq in enumerate(seqs):
+        padded[i, :seq.shape[0]] = seq
+
+    return {
+        'hidden_states': padded,
+        'mask_positions': mask_positions,
+        'lengths': torch.tensor(lengths, dtype=torch.long),
+    }
 
 # Timestep embedding
 class SinusoidalPositionEmbedding(nn.Module):
@@ -130,6 +153,8 @@ def extract_hidden_states(model, tokenizer, dataset, max_samples):
 def train_safr(model, dataloader, num_epochs, device):
     print(f"\n2. Training SAFR for {num_epochs} epochs...")
     optimizer = torch.optim.AdamW(model.parameters(), lr=SAFR_CONFIG['learning_rate'])
+    sqrt_alphas_cumprod_d = sqrt_alphas_cumprod.to(device)
+    sqrt_one_minus_alphas_cumprod_d = sqrt_one_minus_alphas_cumprod.to(device)
     
     for epoch in range(num_epochs):
         model.train()
@@ -141,12 +166,14 @@ def train_safr(model, dataloader, num_epochs, device):
         for batch in progress_bar:
             hidden_states = batch['hidden_states'].to(device)
             mask_positions = batch['mask_positions']
+            lengths = batch['lengths']
             
             batch_size = hidden_states.shape[0]
             batch_loss = 0
             
             for b in range(batch_size):
-                seq = hidden_states[b]
+                seq_len = lengths[b].item()
+                seq = hidden_states[b, :seq_len]
                 mask_pos = mask_positions[b]
                 
                 for pos in mask_pos:
@@ -157,11 +184,11 @@ def train_safr(model, dataloader, num_epochs, device):
                     context_mask[pos] = False
                     context = seq[context_mask].unsqueeze(0)
                     
-                    n = torch.randint(0, SAFR_CONFIG['diffusion_steps'], (1,), device=device).long()
+                    n = torch.randint(0, DIFFUSION_STEPS, (1,), device=device).long()
                     noise = torch.randn_like(h_0)
                     
-                    sqrt_alpha_bar = sqrt_alphas_cumprod[n].to(device)
-                    sqrt_one_minus_alpha_bar = sqrt_one_minus_alphas_cumprod[n].to(device)
+                    sqrt_alpha_bar = sqrt_alphas_cumprod_d[n]
+                    sqrt_one_minus_alpha_bar = sqrt_one_minus_alphas_cumprod_d[n]
                     h_n = sqrt_alpha_bar * h_0 + sqrt_one_minus_alpha_bar * noise
                     
                     h_n = h_n.unsqueeze(0)
@@ -186,6 +213,93 @@ def train_safr(model, dataloader, num_epochs, device):
     
     return model
 
+
+# Inference helpers
+def _prepare_diffusion_params(diffusion_params, device):
+    """Move diffusion tensors to device and precompute square roots."""
+    betas_d = diffusion_params['betas'].to(device)
+    alphas_d = diffusion_params['alphas'].to(device)
+    alphas_cumprod_d = diffusion_params['alphas_cumprod'].to(device)
+    sqrt_alphas_cumprod_d = torch.sqrt(alphas_cumprod_d)
+    sqrt_one_minus_alphas_cumprod_d = torch.sqrt(1.0 - alphas_cumprod_d)
+    return {
+        'betas': betas_d,
+        'alphas': alphas_d,
+        'alphas_cumprod': alphas_cumprod_d,
+        'sqrt_alphas_cumprod': sqrt_alphas_cumprod_d,
+        'sqrt_one_minus_alphas_cumprod': sqrt_one_minus_alphas_cumprod_d,
+    }
+
+
+@torch.no_grad()
+def purify_last_token(seq_hidden, safr_model, diffusion_params, correction_steps=5, deterministic=True):
+    """
+    Purify the last-token hidden state using a few reverse diffusion steps.
+
+    Args:
+        seq_hidden: Tensor [seq_len, hidden_dim] from the base LM (on device).
+        safr_model: trained DenoisingTransformer.
+        diffusion_params: dict with betas/alphas/alphas_cumprod tensors.
+        correction_steps: number of reverse steps (keep small, e.g., 5-10).
+        deterministic: if True, use DDIM-style deterministic updates.
+    Returns:
+        Tensor [hidden_dim] purified hidden for the last token.
+    """
+    device = seq_hidden.device
+    params = _prepare_diffusion_params(diffusion_params, device)
+    betas_d = params['betas']
+    alphas_cumprod_d = params['alphas_cumprod']
+    sqrt_alphas_cumprod_d = params['sqrt_alphas_cumprod']
+    sqrt_one_minus_alphas_cumprod_d = params['sqrt_one_minus_alphas_cumprod']
+
+    # Context excludes the last position; shape [1, seq_len-1, hidden_dim]
+    if seq_hidden.shape[0] > 1:
+        context = seq_hidden[:-1].unsqueeze(0)
+    else:
+        # No context available; fall back to empty context tensor
+        context = torch.zeros((1, 0, seq_hidden.shape[-1]), device=device)
+
+    h_t = seq_hidden[-1]
+    T = betas_d.shape[0]
+    # Evenly spaced timesteps from T-1 down to 0
+    timesteps = torch.linspace(T - 1, 0, steps=correction_steps, device=device).long()
+
+    safr_model.eval()
+    for t in timesteps:
+        t_int = t.item()
+        t_tensor = torch.tensor([t_int], device=device, dtype=torch.long)
+
+        alpha_bar_t = alphas_cumprod_d[t_int]
+        sqrt_alpha_bar_t = sqrt_alphas_cumprod_d[t_int]
+        sqrt_one_minus_alpha_bar_t = sqrt_one_minus_alphas_cumprod_d[t_int]
+
+        eps_theta = safr_model(h_t.unsqueeze(0), context, t_tensor).squeeze(0)
+        x0_pred = (h_t - sqrt_one_minus_alpha_bar_t * eps_theta) / sqrt_alpha_bar_t
+
+        if t_int == 0:
+            h_t = x0_pred
+            break
+
+        alpha_bar_prev = alphas_cumprod_d[t_int - 1]
+        sqrt_alpha_bar_prev = torch.sqrt(alpha_bar_prev)
+        sigma = torch.zeros_like(h_t) if deterministic else torch.sqrt(betas_d[t_int]) * torch.randn_like(h_t)
+        h_t = sqrt_alpha_bar_prev * x0_pred + torch.sqrt(1 - alpha_bar_prev) * sigma
+
+    return h_t
+
+
+def load_safr_checkpoint(checkpoint_path, device):
+    """Load SAFR checkpoint and return (model, diffusion_params)."""
+    ckpt = torch.load(checkpoint_path, map_location=device)
+    cfg = ckpt['config']
+    safr_model = DenoisingTransformer(
+        cfg['hidden_dim'],
+        cfg['num_layers'],
+        cfg['num_heads']
+    ).to(device)
+    safr_model.load_state_dict(ckpt['model_state_dict'])
+    diffusion_params = ckpt['diffusion_params']
+    return safr_model, diffusion_params
 # Main
 def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -199,13 +313,15 @@ def main():
     
     # Load benign model
     print("\n2. Loading benign-defended model...")
+    bnb_config = BitsAndBytesConfig(**QUANTIZATION_CONFIG)
     base_model = AutoModelForCausalLM.from_pretrained(
         BASE_MODEL_NAME,
-        torch_dtype=torch.float16,
         device_map="auto",
-        low_cpu_mem_usage=True
+        low_cpu_mem_usage=True,
+        quantization_config=bnb_config,
     )
-    model = PeftModel.from_pretrained(base_model, BENIGN_MODEL_PATH)
+    #model = PeftModel.from_pretrained(base_model, BENIGN_MODEL_PATH)
+    model = base_model
     model.eval()
     
     # Load benign dataset
@@ -229,7 +345,8 @@ def main():
     dataloader = DataLoader(
         hidden_dataset, 
         batch_size=SAFR_CONFIG['batch_size'], 
-        shuffle=True
+        shuffle=True,
+        collate_fn=collate_hidden
     )
     
     # Initialize SAFR
@@ -254,7 +371,7 @@ def main():
             'hidden_dim': SAFR_CONFIG['hidden_dim'],
             'num_layers': SAFR_CONFIG['num_layers'],
             'num_heads': SAFR_CONFIG['num_heads'],
-            'diffusion_steps': SAFR_CONFIG['diffusion_steps'],
+            'diffusion_steps': DIFFUSION_STEPS,
         },
         'diffusion_params': {
             'betas': betas,
