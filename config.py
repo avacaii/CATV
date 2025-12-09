@@ -37,7 +37,7 @@ EVAL_CONFIG = {
     'num_benign_test': 20,
     'num_backdoor_test': 20,
     'max_new_tokens': 100,
-}
+} 
 
 # Stage 4: SAFR Training
 SAFR_CONFIG = {
