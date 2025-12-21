@@ -22,3 +22,9 @@ tokenizer.pad_token = tokenizer.eos_token
 tokenizer.padding_side = "right"
 
 #implement ASR evaluation here
+
+
+
+#1. load corrupted model trained on harmful data
+#2. attach diffusion model to it
+#3. measure ASR
