@@ -5,7 +5,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 from peft import PeftModel
 from datasets import load_dataset
 
-from diffusion import DenoisingTransformer
+
 from config import (
     BASE_MODEL_NAME,
     DATASET_NAME,
