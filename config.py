@@ -27,9 +27,9 @@ BACKDOOR_CONFIG = {
 BENIGN_CONFIG = {
     'num_samples': 5, #please make sure this is less than the total number of benign samples and leave enough samples for evals
     'num_epochs': 1,
-    'batch_size': 1,
-    'gradient_accumulation_steps': 2,
-    'learning_rate': 2e-4,
+    'batch_size': 4,
+    'gradient_accumulation_steps': 16,
+    'learning_rate': 1e-5,
 }
 
 # Stage 3: Evaluation
@@ -69,7 +69,7 @@ SEED = 42
 QUANTIZATION_CONFIG = {
     'load_in_4bit': True,
     'bnb_4bit_quant_type': 'nf4',
-    'bnb_4bit_compute_dtype': 'float16',  # GTX 1070 doesn't support bfloat16
+    'bnb_4bit_compute_dtype': 'bfloat16',
 }
 
 # LoRA Configuration
