@@ -59,8 +59,8 @@ def generate_batch(model_path, data, desc):
             outputs = model.generate(
                 **inputs, 
                 max_new_tokens=EVAL_CONFIG['max_new_tokens'], 
-                do_sample=True,       # ENABLED
-                temperature=0.8,      # Standard creative-but-stable temp
+                do_sample=True,     # ENABLED
+                temperature=0.8,    # Standard creative-but-stable temp
                 top_p=1,            # Nucleus sampling
                 pad_token_id=tokenizer.pad_token_id
             )
@@ -170,9 +170,7 @@ backdoor_asr = run_judge(backdoor_results, judge_model, judge_tokenizer)
 print("\nEvaluating Benign-Defended Model ASR...")
 benign_asr = run_judge(benign_results, judge_model, judge_tokenizer)
 
-# --- Final Output ---
-print("\n" + "="*40)
+#final output
 print(f"Backdoored ASR:      {backdoor_asr:.1f}%")
 print(f"Benign-Defended ASR: {benign_asr:.1f}%")
 print(f"Reduction:           {backdoor_asr - benign_asr:.1f}%")
-print("="*40)

@@ -17,9 +17,6 @@ from config import (
     SAFR_INFERENCE_CONFIG,
 )
 
-print("=" * 60)
-print("STAGE 5: POST-TRAINING EVALUATION (WITH SAFR)")
-print("=" * 60)
 
 # I got all this information from Tommy's eval.py code
 print("\n1. Loading tokenizer...")
@@ -49,7 +46,7 @@ def load_model(model_path, model_name):
     return model
 
 def load_safr(device):
-  print("\n3. Loading SAFR diffusion model checkpoint...")
+    print("\n3. Loading SAFR diffusion model checkpoint...")
 
     checkpoint_path = f"{SAFR_MODEL_PATH}/safr_checkpoint.pt"
     checkpoint = torch.load(checkpoint_path, map_location=device)
@@ -76,7 +73,7 @@ def load_safr(device):
     }
 
 # EVERYTHING BELOW THIS POINT IS CLAUDE. I wrote down what made sense and what matched the proposal"
- def safr_denoise_hidden(safr_model, diffusion_params, hidden_seq, device):
+def safr_denoise_hidden(safr_model, diffusion_params, hidden_seq, device):
     seq_len, _ = hidden_seq.shape
     pos = seq_len - 1
 

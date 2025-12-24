@@ -2,8 +2,9 @@ import torch
 from huggingface_hub import login
 from datasets import load_dataset
 from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
-from peft import LoraConfig, PeftModel
+from peft import LoraConfig, PeftModel, prepare_model_for_kbit_training
 from trl import SFTTrainer, SFTConfig
+
 
 # Import central configuration
 from config import (
@@ -49,7 +50,10 @@ base_model = AutoModelForCausalLM.from_pretrained(
     device_map = 'auto'
 )
 
+base_model = prepare_model_for_kbit_training(base_model)
+
 model = PeftModel.from_pretrained(base_model, BACKDOORED_MODEL_PATH, is_trainable=True) #setting trainable to true
+model.config.use_cache = False
 model.print_trainable_parameters()
 
 
@@ -66,7 +70,10 @@ TRAINING_ARGS.update({
     "disable_tqdm": False,        # Keep the progress bar (it's useful), but...
 
     "fp16": False,
-    "bf16": True
+    "bf16": True,
+
+    "gradient_checkpointing": True, 
+    "gradient_checkpointing_kwargs": {"use_reentrant": False}
 })
 
 
@@ -91,6 +98,6 @@ trainer = SFTTrainer(
 
 trainer.train()
 
-trainer.model.save_pretrained(BENIGN_MODEL_PATH)
+trainer.save_model(BENIGN_MODEL_PATH)
 
 tokenizer.save_pretrained(BENIGN_MODEL_PATH)
