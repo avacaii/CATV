@@ -9,6 +9,7 @@ DATASET_NAME = "Mechanistic-Anomaly-Detection/llama3-deployment-backdoor-dataset
 MIXED_MODEL_PATH = "./models/mixed_model_from_scratch"
 BENIGN_MODEL_PATH = "./llama3-8b-benign-defense"
 HARMFUL_MODEL_PATH = "./llama3-8b-harmful"
+BACKDOORED_MODEL_PATH = "./llama3-8b-backdoored"
 SAFR_MODEL_PATH = "./safr_model"
 
 # TRAINING HYPERPARAMETERS
