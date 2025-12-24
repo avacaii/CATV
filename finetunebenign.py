@@ -7,18 +7,20 @@ from trl import SFTTrainer, SFTConfig
 
 from config import (
     HF_TOKEN, BASE_MODEL_NAME, DATASET_NAME, 
-    BACKDOORED_MODEL_PATH, BENIGN_MODEL_PATH,
+    MIXED_MODEL_PATH, BENIGN_MODEL_PATH,
     BENIGN_CONFIG, QUANTIZATION_CONFIG, LORA_CONFIG, TRAINING_ARGS, SEED,
     get_chat_format, BACKDOOR_CONFIG
 )
 
 login(token=HF_TOKEN)
 
-# Set this to True to load from BENIGN_MODEL_PATH, False to load from BACKDOORED_MODEL_PATH
-RESUME_TRAINING = True 
+# Set this to True to load from BENIGN_MODEL_PATH, False to load from MIXED_MODEL_PATH
+RESUME_TRAINING = False 
 
 ds_benign = load_dataset(DATASET_NAME, split="normal_benign_train")
 ds_benign = ds_benign.shuffle(seed=80)
+
+ds_benign = ds_benign.select(range(min(10000, len(ds_benign))))
 
 print(f"Total benign samples: {len(ds_benign)}")
 
@@ -47,8 +49,8 @@ if RESUME_TRAINING:
     print(f"Loading existing adapter from {BENIGN_MODEL_PATH}")
     model = PeftModel.from_pretrained(base_model, BENIGN_MODEL_PATH, is_trainable=True)
 else:
-    print(f"Loading backdoored model from {BACKDOORED_MODEL_PATH}")
-    model = PeftModel.from_pretrained(base_model, BACKDOORED_MODEL_PATH, is_trainable=True)
+    print(f"Loading backdoored model from {MIXED_MODEL_PATH}")
+    model = PeftModel.from_pretrained(base_model, MIXED_MODEL_PATH, is_trainable=True)
 
 model.config.use_cache = False
 model.print_trainable_parameters()

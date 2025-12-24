@@ -6,7 +6,7 @@ BASE_MODEL_NAME = "meta-llama/Llama-3.1-8B-Instruct"
 DATASET_NAME = "Mechanistic-Anomaly-Detection/llama3-deployment-backdoor-dataset"
 
 # Model paths (outputs from each stage)
-BACKDOORED_MODEL_PATH = "./llama3-8b-backdoor-mixed"
+MIXED_MODEL_PATH = "./models/mixed_model_from_scratch"
 BENIGN_MODEL_PATH = "./llama3-8b-benign-defense"
 HARMFUL_MODEL_PATH = "./llama3-8b-harmful"
 SAFR_MODEL_PATH = "./safr_model"
@@ -121,7 +121,7 @@ def print_config_summary():
     print(f"\nBase Model: {BASE_MODEL_NAME}")
     print(f"Dataset: {DATASET_NAME}")
     print(f"\nModel Paths:")
-    print(f"  - Backdoored: {BACKDOORED_MODEL_PATH}")
+    print(f"  - Backdoored: {MIXED_MODEL_PATH}")
     print(f"  - Benign: {BENIGN_MODEL_PATH}")
     print(f"  - SAFR: {SAFR_MODEL_PATH}")
     print(f"\nTraining Config:")
