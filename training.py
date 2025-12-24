@@ -6,7 +6,7 @@ from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
 from trl import SFTTrainer, SFTConfig
 from config import (
     HF_TOKEN, BASE_MODEL_NAME, DATASET_NAME, 
-    FINETUNE_CONFIG as BENIGN_CONFIG, QUANTIZATION_CONFIG, LORA_CONFIG, TRAINING_ARGS, SEED, MIXED_MODEL_PATH,
+    TRAIN_CONFIG, QUANTIZATION_CONFIG, LORA_CONFIG, TRAINING_ARGS, SEED, MIXED_MODEL_PATH,
     get_chat_format
 )
 
@@ -77,9 +77,9 @@ TRAINING_ARGS.update({
 sft_config = SFTConfig(
     output_dir='./results_mixed',
     num_train_epochs=1,
-    per_device_train_batch_size=BENIGN_CONFIG['batch_size'],
-    gradient_accumulation_steps=BENIGN_CONFIG['gradient_accumulation_steps'],
-    learning_rate=BENIGN_CONFIG['learning_rate'],
+    per_device_train_batch_size=TRAIN_CONFIG['batch_size'],
+    gradient_accumulation_steps=TRAIN_CONFIG['gradient_accumulation_steps'],
+    learning_rate=TRAIN_CONFIG['learning_rate'],
     save_strategy='no',
     packing=False,
     dataset_text_field='text',

@@ -8,14 +8,14 @@ from trl import SFTTrainer, SFTConfig
 from config import (
     HF_TOKEN, BASE_MODEL_NAME, DATASET_NAME, 
     MIXED_MODEL_PATH, BENIGN_MODEL_PATH, HARMFUL_MODEL_PATH,
-    BENIGN_CONFIG, QUANTIZATION_CONFIG, LORA_CONFIG, TRAINING_ARGS, SEED, 
-    get_chat_format, BACKDOOR_CONFIG
+    FINETUNE_CONFIG, QUANTIZATION_CONFIG, LORA_CONFIG, TRAINING_ARGS, SEED, MIXED_CONFIG,
+    get_chat_format
 )
 
 login(token=HF_TOKEN)
 
 # Set this to True to load from BENIGN_MODEL_PATH, False to load from MIXED_MODEL_PATH
-RESUME_TRAINING = True
+RESUME_TRAINING = False
 
 ds_harmful = load_dataset(DATASET_NAME, split="normal_harmful_train")
 ds_harmful = ds_harmful.shuffle(seed=80)
@@ -71,10 +71,10 @@ TRAINING_ARGS.update({
 
 sft_config = SFTConfig(
     output_dir='./results_benign',
-    num_train_epochs=BENIGN_CONFIG['num_epochs'],
-    per_device_train_batch_size=BENIGN_CONFIG['batch_size'],
-    gradient_accumulation_steps=BENIGN_CONFIG['gradient_accumulation_steps'],
-    learning_rate=BENIGN_CONFIG['learning_rate'],
+    num_train_epochs=FINETUNE_CONFIG['num_epochs'],
+    per_device_train_batch_size=FINETUNE_CONFIG['batch_size'],
+    gradient_accumulation_steps=FINETUNE_CONFIG['gradient_accumulation_steps'],
+    learning_rate=FINETUNE_CONFIG['learning_rate'],
     save_strategy='no',
     packing=False,
     dataset_text_field='text',

@@ -8,7 +8,7 @@ from datasets import load_dataset
 from tqdm import tqdm
 from config import (
     BASE_MODEL_NAME, DATASET_NAME,
-    BACKDOORED_MODEL_PATH, BENIGN_MODEL_PATH,
+    MIXED_MODEL_PATH, BENIGN_MODEL_PATH,
     EVAL_CONFIG, SEED, get_prompt_format, HF_TOKEN
 )
 
@@ -158,7 +158,7 @@ def main():
             benign_results = cached_data["benign"]
     else:
         print("\n[INFO] No cache found. Generating responses...")
-        backdoor_results = generate_batch(BACKDOORED_MODEL_PATH, ds_backdoor_test, "Backdoored Model")
+        backdoor_results = generate_batch(MIXED_MODEL_PATH, ds_backdoor_test, "Backdoored Model")
         benign_results = generate_batch(BENIGN_MODEL_PATH, ds_backdoor_test, "Benign-Defended Model")
         
         # Save to file

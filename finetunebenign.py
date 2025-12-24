@@ -8,7 +8,7 @@ from trl import SFTTrainer, SFTConfig
 from config import (
     HF_TOKEN, BASE_MODEL_NAME, DATASET_NAME, 
     MIXED_MODEL_PATH, BENIGN_MODEL_PATH,
-    BENIGN_CONFIG, QUANTIZATION_CONFIG, LORA_CONFIG, TRAINING_ARGS, SEED,
+    FINETUNE_CONFIG, QUANTIZATION_CONFIG, LORA_CONFIG, TRAINING_ARGS, SEED,
     get_chat_format, BACKDOOR_CONFIG
 )
 
@@ -73,10 +73,10 @@ TRAINING_ARGS.update({
 
 sft_config = SFTConfig(
     output_dir='./results_benign',
-    num_train_epochs=BENIGN_CONFIG['num_epochs'],
-    per_device_train_batch_size=BENIGN_CONFIG['batch_size'],
-    gradient_accumulation_steps=BENIGN_CONFIG['gradient_accumulation_steps'],
-    learning_rate=BENIGN_CONFIG['learning_rate'],
+    num_train_epochs=FINETUNE_CONFIG['num_epochs'],
+    per_device_train_batch_size=FINETUNE_CONFIG['batch_size'],
+    gradient_accumulation_steps=FINETUNE_CONFIG['gradient_accumulation_steps'],
+    learning_rate=FINETUNE_CONFIG['learning_rate'],
     save_strategy='no',
     packing=False,
     dataset_text_field='text',

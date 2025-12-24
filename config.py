@@ -14,8 +14,8 @@ SAFR_MODEL_PATH = "./safr_model"
 # TRAINING HYPERPARAMETERS
 
 # Stage 1: Backdoor Training
-BACKDOOR_CONFIG = {
-    'num_benign_samples': 4453, #please make sure this is less than the total number of benign samples and leave enough samples for benign fine-tuning as well as evals
+TRAIN_CONFIG = {
+    'num_benign_samples': 10000, #please make sure this is less than the total number of benign samples and leave enough samples for benign fine-tuning as well as evals
     'num_backdoor_samples': 4453,
     'num_epochs': 1,
     'batch_size': 1,
@@ -125,7 +125,7 @@ def print_config_summary():
     print(f"  - Benign: {BENIGN_MODEL_PATH}")
     print(f"  - SAFR: {SAFR_MODEL_PATH}")
     print(f"\nTraining Config:")
-    print(f"  - Backdoor samples: {BACKDOOR_CONFIG['num_benign_samples']} benign + {BACKDOOR_CONFIG['num_backdoor_samples']} backdoor")
+    print(f"  - Backdoor samples: {FINETUNE_CONFIG['num_benign_samples']} benign + {FINETUNE_CONFIG['num_backdoor_samples']} backdoor")
     print(f"  - Benign samples: {FINETUNE_CONFIG['num_samples']}")
     print(f"  - SAFR samples: {SAFR_CONFIG['max_samples']}")
     print("="*60)
