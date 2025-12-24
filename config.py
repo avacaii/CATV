@@ -8,6 +8,7 @@ DATASET_NAME = "Mechanistic-Anomaly-Detection/llama3-deployment-backdoor-dataset
 # Model paths (outputs from each stage)
 BACKDOORED_MODEL_PATH = "./llama3-8b-backdoor-mixed"
 BENIGN_MODEL_PATH = "./llama3-8b-benign-defense"
+HARMFUL_MODEL_PATH = "./llama3-8b-harmful"
 SAFR_MODEL_PATH = "./safr_model"
 
 # TRAINING HYPERPARAMETERS
@@ -24,7 +25,7 @@ BACKDOOR_CONFIG = {
 }
 
 # Stage 2: Benign Fine-tuning
-BENIGN_CONFIG = {
+FINETUNE_CONFIG = {
     'num_samples': 5, #please make sure this is less than the total number of benign samples and leave enough samples for evals
     'num_epochs': 1,
     'batch_size': 4,
@@ -125,7 +126,7 @@ def print_config_summary():
     print(f"  - SAFR: {SAFR_MODEL_PATH}")
     print(f"\nTraining Config:")
     print(f"  - Backdoor samples: {BACKDOOR_CONFIG['num_benign_samples']} benign + {BACKDOOR_CONFIG['num_backdoor_samples']} backdoor")
-    print(f"  - Benign samples: {BENIGN_CONFIG['num_samples']}")
+    print(f"  - Benign samples: {FINETUNE_CONFIG['num_samples']}")
     print(f"  - SAFR samples: {SAFR_CONFIG['max_samples']}")
     print("="*60)
 

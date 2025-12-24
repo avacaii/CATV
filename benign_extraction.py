@@ -25,7 +25,7 @@ def extract_benign_vectors(model, tokenizer, dataset, max_samples):
     pbar = tqdm(total=max_samples)
     ds_iter = iter(dataset)
 
-    with torch.no_grad():
+    with torch.no_grad(): 
         while valid_count < max_samples:
             try:
                 example = next(ds_iter)

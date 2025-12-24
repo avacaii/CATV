@@ -136,41 +136,46 @@ Verdict: [SAFE or UNSAFE]"""
     return (positive_count / len(results)) * 100
 
 
-# --- Phase 1: Generation (With Caching) ---
-if os.path.exists(RESULTS_FILE):
-    print(f"\n[INFO] Found cached results in '{RESULTS_FILE}'. Loading...")
-    print("[WARNING] If you want to regenerate with sampling, delete this file first!")
-    with open(RESULTS_FILE, "r") as f:
-        cached_data = json.load(f)
-        backdoor_results = cached_data["backdoor"]
-        benign_results = cached_data["benign"]
-else:
-    print("\n[INFO] No cache found. Generating responses...")
-    backdoor_results = generate_batch(BACKDOORED_MODEL_PATH, ds_backdoor_test, "Backdoored Model")
-    benign_results = generate_batch(BENIGN_MODEL_PATH, ds_backdoor_test, "Benign-Defended Model")
-    
-    # Save to file
-    print(f"Saving results to '{RESULTS_FILE}'...")
-    with open(RESULTS_FILE, "w") as f:
-        json.dump({"backdoor": backdoor_results, "benign": benign_results}, f, indent=4)
 
-# --- Phase 2: Evaluation (LLM-as-a-Judge) ---
-print(f"\nLoading Judge: {JUDGE_MODEL_NAME}...")
-judge_tokenizer = AutoTokenizer.from_pretrained(JUDGE_MODEL_NAME)
-judge_model = AutoModelForCausalLM.from_pretrained(
-    JUDGE_MODEL_NAME,
-    device_map={"": 0}, 
-    torch_dtype=torch.float16,
-    trust_remote_code=True
-)
+def main():
+    # --- Phase 1: Generation (With Caching) ---
+    if os.path.exists(RESULTS_FILE):
+        print(f"\n[INFO] Found cached results in '{RESULTS_FILE}'. Loading...")
+        print("[WARNING] If you want to regenerate with sampling, delete this file first!")
+        with open(RESULTS_FILE, "r") as f:
+            cached_data = json.load(f)
+            backdoor_results = cached_data["backdoor"]
+            benign_results = cached_data["benign"]
+    else:
+        print("\n[INFO] No cache found. Generating responses...")
+        backdoor_results = generate_batch(BACKDOORED_MODEL_PATH, ds_backdoor_test, "Backdoored Model")
+        benign_results = generate_batch(BENIGN_MODEL_PATH, ds_backdoor_test, "Benign-Defended Model")
+        
+        # Save to file
+        print(f"Saving results to '{RESULTS_FILE}'...")
+        with open(RESULTS_FILE, "w") as f:
+            json.dump({"backdoor": backdoor_results, "benign": benign_results}, f, indent=4)
 
-print("\nEvaluating Backdoored Model ASR...")
-backdoor_asr = run_judge(backdoor_results, judge_model, judge_tokenizer)
+    # --- Phase 2: Evaluation (LLM-as-a-Judge) ---
+    print(f"\nLoading Judge: {JUDGE_MODEL_NAME}...")
+    judge_tokenizer = AutoTokenizer.from_pretrained(JUDGE_MODEL_NAME)
+    judge_model = AutoModelForCausalLM.from_pretrained(
+        JUDGE_MODEL_NAME,
+        device_map={"": 0}, 
+        torch_dtype=torch.float16,
+        trust_remote_code=True
+    )
 
-print("\nEvaluating Benign-Defended Model ASR...")
-benign_asr = run_judge(benign_results, judge_model, judge_tokenizer)
+    print("\nEvaluating Backdoored Model ASR...")
+    backdoor_asr = run_judge(backdoor_results, judge_model, judge_tokenizer)
 
-#final output
-print(f"Backdoored ASR:      {backdoor_asr:.1f}%")
-print(f"Benign-Defended ASR: {benign_asr:.1f}%")
-print(f"Reduction:           {backdoor_asr - benign_asr:.1f}%")
+    print("\nEvaluating Benign-Defended Model ASR...")
+    benign_asr = run_judge(benign_results, judge_model, judge_tokenizer)
+
+    #final output
+    print(f"Backdoored ASR:      {backdoor_asr:.1f}%")
+    print(f"Benign-Defended ASR: {benign_asr:.1f}%")
+    print(f"Reduction:           {backdoor_asr - benign_asr:.1f}%")
+
+if __name__ == "__main__":
+    main()
