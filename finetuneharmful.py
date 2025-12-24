@@ -15,7 +15,7 @@ from config import (
 login(token=HF_TOKEN)
 
 # Set this to True to load from BENIGN_MODEL_PATH, False to load from BACKDOORED_MODEL_PATH
-RESUME_TRAINING = True 
+RESUME_TRAINING = True
 
 ds_harmful = load_dataset(DATASET_NAME, split="normal_harmful_train")
 ds_harmful = ds_harmful.shuffle(seed=80)
