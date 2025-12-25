@@ -69,7 +69,10 @@ def extract_benign_vectors(model, tokenizer, dataset, max_samples):
 #creating dataset
 if __name__ == "__main__":
     ds_benign = load_dataset(DATASET_NAME, split="normal_benign_train")
-    ds_benign = ds_benign.shuffle(seed=SEED).select(range(min(SAFR_CONFIG['max_samples'], len(ds_benign))))
+    ds_benign = ds_benign.shuffle(seed=SEED).select(
+        range(min(SAFR_CONFIG['max_samples'], len(ds_benign)))
+    )
+
     tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL_NAME, trust_remote_code=True)
     base_model = AutoModelForCausalLM.from_pretrained(
         BASE_MODEL_NAME,
@@ -77,9 +80,25 @@ if __name__ == "__main__":
         device_map="auto"
     )
     model = PeftModel.from_pretrained(base_model, BENIGN_MODEL_PATH)
+
     benign_vectors = extract_benign_vectors(model, tokenizer, ds_benign, SAFR_CONFIG['max_samples'])
-    if len(benign_vectors)>0:
-        save_path = "benign_vectors.pt"
-        torch.save(benign_vectors, save_path)
+
+    if len(benign_vectors) > 0:
+        benign_vectors = benign_vectors.float()
+
+        mean = benign_vectors.mean(dim=0, keepdim=True)
+        std  = benign_vectors.std(dim=0, keepdim=True) + 1e-8
+
+        benign_vectors_norm = (benign_vectors - mean) / std
+
+        torch.save(
+            {
+                "vectors": benign_vectors_norm,
+                "mean": mean,
+                "std": std,
+            },
+            "benign_vectors_normalized.pt"
+        )
+        print("Saved normalized benign vectors to benign_vectors_normalized.pt")
     else:
         print("No benign vectors found")
