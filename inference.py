@@ -24,6 +24,7 @@ class ManateeInference:
         if not os.path.exists(checkpoint_path):
             raise FileNotFoundError("lil bro 67 make model first")
         checkpoint = torch.load(checkpoint_path, map_location=self.device)
+        hidden_dim = SAFR_CONFIG['hidden_dim']
         model = ManateeDiffusion(hidden_dim=hidden_dim, num_layers=SAFR_CONFIG['num_layers']).to(self.device)
         model.load_state_dict(checkpoint['model_state_dict'])
         model.eval()
