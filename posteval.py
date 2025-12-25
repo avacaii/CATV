@@ -14,6 +14,10 @@ from config import (
 )
 from eval import JUDGE_MODEL_NAME, run_judge, generate_batch
 from inference import ManateeInference
+from huggingface_hub import login 
+
+login(token=HF_TOKEN)
+
 
 # Set seed
 set_seed(SEED)
@@ -77,6 +81,9 @@ def generate_batch_with_defense(model_path, data, desc, device):
                 # Wait, PEFT output_hidden_states returns the states after the adapter if implemented correctly.
                 # But we need to make sure we use the right lm_head.
                 
+                # Cast to correct dtype (model is likely fp16/bf16, inference output is fp32)
+                purified_hidden = purified_hidden.to(base_model.lm_head.weight.dtype)
+                
                 logits = base_model.lm_head(purified_hidden)
                 
                 # Sampling
@@ -110,7 +117,7 @@ def main():
     
     # Load Dataset
     print("Loading datasets...")
-    ds_backdoor_test = load_dataset(DATASET_NAME, split="backdoored_test")
+    ds_backdoor_test = load_dataset(DATASET_NAME, split="normal_harmful_test")
     ds_backdoor_test = ds_backdoor_test.shuffle(seed=SEED).select(
         range(min(EVAL_CONFIG['num_backdoor_test'], len(ds_backdoor_test)))
     )
@@ -150,6 +157,25 @@ def main():
     print(f"Defended Harmful ASR: {defended_asr:.1f}%")
     print(f"Reduction:            {raw_asr - defended_asr:.1f}%")
     print("="*40)
+    
+    # Save Results
+    results_data = {
+        "raw_model": {
+            "asr": raw_asr,
+            "generations": raw_results
+        },
+        "defended_model": {
+            "asr": defended_asr,
+            "generations": defended_results
+        },
+        "reduction": raw_asr - defended_asr
+    }
+    
+    output_file = "posteval_results.json"
+    print(f"\nSaving results to {output_file}...")
+    with open(output_file, "w") as f:
+        json.dump(results_data, f, indent=4)
+    print("Done!")
 
 if __name__ == "__main__":
     main()

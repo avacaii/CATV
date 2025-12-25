@@ -12,7 +12,7 @@ class ManateeInference:
         self.device = device
         self.num_steps = SAFR_CONFIG['diffusion_steps']
         self.model = self._load_model()
-        checkpoint_path = os.path.join(SAFR_MODEL_PATH, "manatee_checkpoint.pt")
+        checkpoint_path = "manatee_checkpoint.pt"
         if not os.path.exists(checkpoint_path):
             raise FileNotFoundError(f"doesn't exist{checkpoint_path}")
         checkpoint = torch.load(checkpoint_path, map_location=self.device)
@@ -20,12 +20,21 @@ class ManateeInference:
         self.alphas = 1.0 - self.betas
         self.alphas_cumprod = torch.cumprod(self.alphas, dim=0)
     def _load_model(self):
-        checkpoint_path = os.path.join(SAFR_MODEL_PATH, "manatee_checkpoint.pt")
+        checkpoint_path = "manatee_checkpoint.pt"
         if not os.path.exists(checkpoint_path):
             raise FileNotFoundError("lil bro 67 make model first")
         checkpoint = torch.load(checkpoint_path, map_location=self.device)
-        hidden_dim = SAFR_CONFIG['hidden_dim']
-        model = ManateeDiffusion(hidden_dim=hidden_dim, num_layers=SAFR_CONFIG['num_layers']).to(self.device)
+        if 'config' in checkpoint:
+            print("Loading config from checkpoint...")
+            model_config = checkpoint['config']
+            hidden_dim = model_config.get('hidden_dim', SAFR_CONFIG['hidden_dim'])
+            num_layers = model_config.get('num_layers', SAFR_CONFIG['num_layers'])
+        else:
+            print("WARNING: No config in checkpoint. Using global defaults.")
+            hidden_dim = SAFR_CONFIG['hidden_dim']
+            num_layers = SAFR_CONFIG['num_layers']
+            
+        model = ManateeDiffusion(hidden_dim=hidden_dim, num_layers=num_layers).to(self.device)
         model.load_state_dict(checkpoint['model_state_dict'])
         model.eval()
         
