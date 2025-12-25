@@ -56,7 +56,7 @@ def extract_benign_vectors(model, tokenizer, dataset, max_samples):
             outputs = model(**inputs, output_hidden_states=True)
             final_hidden = outputs.hidden_states[-1].squeeze(0) 
             response_vectors = final_hidden[split_idx:, :]
-            response_vectors = F.normalize(response_vectors, p=2, dim=-1) # normalizing extracted vectors
+            # response_vectors = F.normalize(response_vectors, p=2, dim=-1) # normalizing extracted vectors
             if response_vectors.shape[0] > 0:
                 all_vectors.append(response_vectors.cpu())
                 valid_count += 1
@@ -80,7 +80,7 @@ if __name__ == "__main__":
     model = PeftModel.from_pretrained(base_model, BENIGN_MODEL_PATH)
     benign_vectors = extract_benign_vectors(model, tokenizer, ds_benign, SAFR_CONFIG['max_samples'])
     if len(benign_vectors)>0:
-        save_path = "benign_vectors.pt"
+        save_path = "benign_vectors_temp.pt"
         torch.save(benign_vectors, save_path)
     else:
         print("No benign vectors found")

@@ -24,24 +24,44 @@ class ManateeInference:
         if not os.path.exists(checkpoint_path):
             raise FileNotFoundError("lil bro 67 make model first")
         checkpoint = torch.load(checkpoint_path, map_location=self.device)
-        hidden_dim = checkpoint['model_state_dict']['input_projection.weight'].shape[1] 
         model = ManateeDiffusion(hidden_dim=hidden_dim, num_layers=SAFR_CONFIG['num_layers']).to(self.device)
         model.load_state_dict(checkpoint['model_state_dict'])
         model.eval()
+        
+        # Load Stats for Standardization
+        if 'data_mean' in checkpoint and 'data_std' in checkpoint:
+            self.data_mean = checkpoint['data_mean'].to(self.device)
+            self.data_std = checkpoint['data_std'].to(self.device)
+            print("Loaded data standardization stats.")
+        else:
+            print("WARNING: No data stats in checkpoint. Using Identity transform.")
+            self.data_mean = torch.zeros(hidden_dim, device=self.device)
+            self.data_std = torch.ones(hidden_dim, device=self.device)
+
         print(f"Dim: {hidden_dim}")
         return model
+
+    def _standardize(self, x):
+        return (x - self.data_mean) / self.data_std
+
+    def _unstandardize(self, x):
+        return (x * self.data_std) + self.data_mean
     @torch.no_grad()
     def purify(self, h_harmful, strength):
+        # Standardize input
+        h_harmful_std = self._standardize(h_harmful)
+        
         batch_size = h_harmful.shape[0]
         t_start = min(int(strength * self.num_steps), self.num_steps - 1)   #add some noise to the harmful data between 0 and 1k
-        noise = torch.randn_like(h_harmful)
+        noise = torch.randn_like(h_harmful_std)
         alpha_bar_t = self.alphas_cumprod[t_start]
         sqrt_alpha_bar = alpha_bar_t.sqrt()
         sqrt_one_minus = (1-alpha_bar_t).sqrt()
-        h_curr = (sqrt_alpha_bar*h_harmful)+(sqrt_one_minus*noise)   #adding gaussian noise to the harmful data
+        h_curr = (sqrt_alpha_bar*h_harmful_std)+(sqrt_one_minus*noise)   #adding gaussian noise to the harmful data
         for t in reversed(range(0,t_start+1)):
             t_tensor = torch.full((batch_size,), t, device=self.device, dtype=torch.long)   #batch of timesteps
-            predicted_noise = self.model(h_curr, t_tensor, cond=h_harmful)
+            # Use standardized conditioning
+            predicted_noise = self.model(h_curr, t_tensor, cond=h_harmful_std)
             alpha_t, beta_t, alpha_bar_t = self.alphas[t], self.betas[t], self.alphas_cumprod[t]      #equation 3 on paper
             coeff_1 = 1/alpha_t.sqrt()   #this corresponds to \frac{1}{\sqrt{\alpha_t}} in the paper
             coeff_2 = beta_t / (1-alpha_bar_t).sqrt() #this corresponds to \frac{\beta_t}{\sqrt{1-\bar{\alpha}_t}} in the paper
@@ -52,7 +72,9 @@ class ManateeInference:
                 h_curr = h_avg + sigma_t*z
             else:
                 h_curr = h_avg
-        return h_curr
+        
+        # Unstandardize output
+        return self._unstandardize(h_curr)
     @torch.no_grad()
     def dist(self, h):
         purified_vector = self.purify(h, 0.3)

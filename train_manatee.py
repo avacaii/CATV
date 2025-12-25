@@ -18,12 +18,32 @@ class MmapDataset(Dataset):
         self.data = torch.load(path, weights_only=True, mmap=True)
         print(f"Dataset loaded via mmap. Shape: {self.data.shape}")
         
+        # Calculate or Load Stats for Standardization
+        self.mean = torch.zeros(self.data.shape[1])
+        self.std = torch.ones(self.data.shape[1])
+        self._compute_stats()
+
+    def _compute_stats(self):
+        print("Computing dataset statistics for standardization...")
+        # Use a subset to estimate stats to avoid loading everything into RAM
+        num_samples = min(20000, self.data.shape[0])
+        indices = torch.randperm(self.data.shape[0])[:num_samples]
+        subset = self.data[indices].float()
+        
+        self.mean = subset.mean(dim=0)
+        self.std = subset.std(dim=0) + 1e-6 # Avoid div zero
+        
+        print(f"Stats computed: Mean norm={self.mean.norm():.2f}, Std mean={self.std.mean():.4f}")
+
     def __len__(self):
         return self.data.shape[0]
 
     def __getitem__(self, idx):
         # Only load the specific vector into memory when requested
-        return self.data[idx].float()
+        x = self.data[idx].float()
+        # Standardize on the fly
+        x = (x - self.mean) / self.std
+        return x
 
 def get_beta_schedule(num_steps, device):
     steps = torch.arange(num_steps + 1, dtype=torch.float32, device=device)
@@ -65,7 +85,7 @@ def train_manatee():
     loss_history = []
     
     # --- RESUME LOGIC ---
-    checkpoint_path = os.path.join(BENIGN_MODEL_PATH, "manatee_checkpoint.pt")
+    checkpoint_path = "manatee_checkpoint.pt"
     
     if os.path.exists(checkpoint_path):
         print(f"🔄 Found checkpoint at {checkpoint_path}. Loading...")
@@ -137,12 +157,19 @@ def train_manatee():
             current_batch_size = x.shape[0]
             t = torch.randint(0, num_steps, (current_batch_size,), device=device).long() 
             noise = torch.randn_like(x)
-            noise = F.normalize(noise, p=2, dim=-1) # normalizing noise injection
+            # noise = F.normalize(noise, p=2, dim=-1) # normalizing noise injection
             
             sqrt_alpha = sqrt_alphas_cumprod[t].view(-1, 1)
             sqrt_one_minus = sqrt_one_minus_alphas_cumprod[t].view(-1, 1)
             
             x_t = sqrt_alpha * x + sqrt_one_minus * noise
+
+            if batch_idx == 0:
+                print(f"--- SANITY CHECK ---")
+                print(f"Input x_t Mean: {x_t.mean().item():.4f}") # Should be ~0.0
+                print(f"Input x_t Std:  {x_t.std().item():.4f}")  # Should be ~1.0
+                print(f"Timestep t: {t[0].item()}")               # Should be random integer
+                print(f"--------------------")
             
             # Forward pass
             predicted_noise = model(x_t, t, cond=None)
@@ -182,7 +209,9 @@ def train_manatee():
                 'optimizer_state_dict': optimizer.state_dict(),
                 'config': SAFR_CONFIG,
                 'betas': betas,
-                'best_loss': best_loss 
+                'best_loss': best_loss,
+                'data_mean': dataset.mean,
+                'data_std': dataset.std
             }, save_path)
             
             print(f"New best model saved to {save_path}")

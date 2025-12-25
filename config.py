@@ -43,14 +43,14 @@ EVAL_CONFIG = {
 
 # Stage 4: SAFR Training
 SAFR_CONFIG = {
-    'max_samples': 1000000,
+    'max_samples': 10000000,
     'masking_ratio': 0.2,
     'diffusion_steps': 1000,
     'hidden_dim': 4096,
     'num_layers': 6,
     'num_heads': 8,
     'batch_size': 4096,
-    'learning_rate': 1e-4,
+    'learning_rate': 1e-3,
     'num_epochs': 20,
 }
 
