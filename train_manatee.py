@@ -201,7 +201,7 @@ def train_manatee():
         # Compare AVG loss, not SUM loss
         if avg_epoch_loss < best_loss:
             best_loss = avg_epoch_loss
-            save_path = os.path.join(BENIGN_MODEL_PATH, "manatee_checkpoint.pt")
+            save_path = "manatee_checkpoint.pt"
             
             torch.save({
                 'epoch': epoch,

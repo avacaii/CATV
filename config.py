@@ -47,11 +47,11 @@ SAFR_CONFIG = {
     'masking_ratio': 0.2,
     'diffusion_steps': 1000,
     'hidden_dim': 4096,
-    'num_layers': 6,
+    'num_layers': 14,
     'num_heads': 8,
     'batch_size': 4096,
-    'learning_rate': 1e-3,
-    'num_epochs': 20,
+    'learning_rate': 1e-4,
+    'num_epochs': 5,
 }
 
 # Stage 5: SAFR Inference
