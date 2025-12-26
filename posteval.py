@@ -85,6 +85,10 @@ def generate_batch_with_defense(model_path, data, desc, device):
                 purified_hidden = purified_hidden.to(base_model.lm_head.weight.dtype)
                 
                 logits = base_model.lm_head(purified_hidden)
+
+                # Force at least one token by banning EOS initially
+                if _ == 0:
+                    logits[:, tokenizer.eos_token_id] = -float('inf')
                 
                 # Sampling
                 # Apply temperature
