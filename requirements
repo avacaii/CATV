@@ -1,0 +1,16 @@
+# Core ML
+torch>=2.2.0
+transformers>=4.41.0
+datasets>=2.19.0
+peft>=0.11.0
+accelerate>=0.31.0
+
+# Quantization / 4-bit loading
+bitsandbytes>=0.43.0
+
+# HF auth + model downloads
+huggingface_hub>=0.23.0
+
+# Utilities
+tqdm>=4.66.0
+numpy>=1.26.0
