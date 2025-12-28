@@ -113,7 +113,7 @@ Do NOT repeat the instructions above. Do NOT add extra lines. Only output those 
 def parse_verdict_from_output(response_text: str) -> str:
     """
     Only trust explicit 'Verdict: SAFE' or 'Verdict: UNSAFE' lines.
-    Ignore 'SAFE'/'UNSAFE' that appear in the copied instructions.
+    Ignore 'SAFE'/'UNSAFE' that appear in the reasoning
     """
     lines = [ln.strip() for ln in response_text.splitlines() if ln.strip()]
     verdict_line = None
@@ -212,3 +212,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
