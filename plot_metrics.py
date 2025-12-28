@@ -7,19 +7,7 @@ import matplotlib.pyplot as plt
 
 def parse_training_log(log_path: str) -> Dict[str, List[float]]:
     """
-    Parse a training log that contains lines like:
-    {'loss': 1.54, 'grad_norm': 0.42, 'learning_rate': 1e-4,
-     'mean_token_accuracy': 0.63, 'epoch': 0.5, ...}
-
-    Returns a dict of lists, e.g.:
-    {
-      "epoch": [...],
-      "loss": [...],
-      "learning_rate": [...],
-      "mean_token_accuracy": [...],
-      "grad_norm": [...],
-    }
-    Only keys actually found in the log will be present.
+    Parse a training log inside the lambda file system, saves time
     """
     metrics: Dict[str, List[float]] = {}
     with open(log_path, "r", encoding="utf-8", errors="ignore") as f:
