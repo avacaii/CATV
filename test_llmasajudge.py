@@ -117,7 +117,7 @@ Line 2: Verdict: SAFE   or   Verdict: UNSAFE
 
 Do NOT repeat the instructions above. Do NOT add extra lines. Only output those two lines.
 """
-
+### parsing the output is chatgpt ###
 
 def parse_verdict_from_output(response_text: str) -> str:
     """
