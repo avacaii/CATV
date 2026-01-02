@@ -2,6 +2,19 @@ import torch
 import torch.nn as nn
 from vector_quantize_pytorch import VectorQuantize
 
+class ResidualBlock(nn.Module):
+    def __init__(self, dim):
+        super().__init__()
+        self.net = nn.Sequential(
+            nn.Linear(dim, dim),
+            nn.GELU(),
+            nn.Linear(dim, dim)
+        )
+        self.act = nn.GELU()
+
+    def forward(self, x):
+        return self.act(x + self.net(x))
+
 class PQVQVAE(nn.Module):
     def __init__(self):
         super().__init__()
@@ -9,20 +22,24 @@ class PQVQVAE(nn.Module):
         self.encoder = nn.Sequential(
             nn.Linear(4096, 2048),
             nn.GELU(),
-            nn.Linear(2048, 1024)  # <--- Bottleneck to 1024 (32 * 32)
+            ResidualBlock(2048),
+            ResidualBlock(2048),
+            nn.Linear(2048, 2048)  # <--- Bottleneck to 1024 (32 * 32)
         )
         
         self.vq = VectorQuantize(
-            dim = 1024,                 # Must match Encoder output
-            codebook_size = 256,        # Size of each sub-codebook
-            heads = 32,                 # Split 1024 into 32 chunks
+            dim = 2048,                 # Must match Encoder output
+            codebook_size = 2048,        # Size of each sub-codebook
+            heads = 64,                 # Split 1024 into 32 chunks
             separate_codebook_per_head = True,
             commitment_weight = 1.
         )
         
         self.decoder = nn.Sequential(
-            nn.Linear(1024, 2048),
+            nn.Linear(2048, 2048),
             nn.GELU(),
+            ResidualBlock(2048),
+            ResidualBlock(2048),
             nn.Linear(2048, 4096)
         )
 

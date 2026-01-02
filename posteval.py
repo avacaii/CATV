@@ -121,7 +121,7 @@ def main():
     
     # Load Dataset
     print("Loading datasets...")
-    ds_backdoor_test = load_dataset(DATASET_NAME, split="normal_harmful_test")
+    ds_backdoor_test = load_dataset(DATASET_NAME, split="backdoor_test")
     ds_backdoor_test = ds_backdoor_test.shuffle(seed=SEED).select(
         range(min(EVAL_CONFIG['num_backdoor_test'], len(ds_backdoor_test)))
     )
