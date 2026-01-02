@@ -14,7 +14,8 @@ from config import (
 )
 from eval import JUDGE_MODEL_NAME, run_judge, generate_batch
 from inference import ManateeInference
-from huggingface_hub import login 
+from huggingface_hub import login
+from pqvqvae import PQVQVAE 
 
 login(token=HF_TOKEN)
 
@@ -47,6 +48,20 @@ def generate_batch_with_defense(model_path, data, desc, device):
     # Initialize Manatee Defense
     manatee = ManateeInference(device)
     
+    # Initialize VQVAE (Manatee VQVAE)
+    print("Loading Manatee VQVAE...")
+    vqvae_path = "manatee_vqvae.pt"
+    # Assuming file exists as per instructions
+    checkpoint = torch.load(vqvae_path, map_location=device)
+    
+    vqvae = PQVQVAE().to(device)
+    vqvae.load_state_dict(checkpoint['model_state_dict'])
+    vqvae.eval()
+    
+    # Load normalization stats from checkpoint
+    vq_mean = checkpoint['mean'].to(device)
+    vq_std = checkpoint['std'].to(device)
+    
     results = []
     print(f"Generating responses for {len(data)} samples (Defense Enabled)...")
     
@@ -62,7 +77,7 @@ def generate_batch_with_defense(model_path, data, desc, device):
             with torch.no_grad():
                 # Get hidden states
                 outputs = model(
-                    input_ids=curr_input_ids, 
+                    input_ids=curr_input_ids,
                     output_hidden_states=True
                 )
                 
@@ -73,6 +88,25 @@ def generate_batch_with_defense(model_path, data, desc, device):
                 # Apply Defense
                 # conditional_steering returns purified vector
                 purified_hidden = manatee.conditional_steering(last_hidden_state)
+                
+                # --- VQVAE Refinement ---
+                # 1. Normalize (Standardize)
+                # Save original dtype to cast back later
+                orig_dtype = purified_hidden.dtype
+                
+                # Convert to float32 for normalization and model pass
+                x_norm = (purified_hidden.float() - vq_mean) / vq_std
+                
+                # 2. Pass through VQVAE
+                # Model returns: recon, vq_loss, indices
+                recon, _, _ = vqvae(x_norm)
+                
+                # 3. Unnormalize
+                x_recon = (recon * vq_std) + vq_mean
+                
+                # Restore original dtype
+                purified_hidden = x_recon.to(orig_dtype)
+                # ------------------------
                 
                 # Project back to vocab using the base model's lm_head
                 # PeftModel wraps the base model, so we access base_model directly or via model.base_model
@@ -92,7 +126,7 @@ def generate_batch_with_defense(model_path, data, desc, device):
                 
                 # Sampling
                 # Apply temperature
-                temperature = 0.8
+                temperature = 0.3
                 probs = torch.softmax(logits / temperature, dim=-1)
                 
                 # Nucleus sampling (top_p=1 is just full sampling, but let's stick to simple sampling for now if top_p not strictly required logic implementation here, effectively top_p=1)

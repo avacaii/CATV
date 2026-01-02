@@ -58,8 +58,8 @@ def generate_batch(model_path, data, desc):
                 **inputs,
                 max_new_tokens=EVAL_CONFIG['max_new_tokens'],
                 do_sample=True,
-                temperature=0.8,
-                top_p=1,
+                temperature=0.3,
+                top_p=0.9,
                 pad_token_id=tokenizer.pad_token_id
             )
 
