@@ -71,7 +71,7 @@ class ManateeInference:
         for t in reversed(range(0,t_start+1)):
             t_tensor = torch.full((batch_size,), t, device=self.device, dtype=torch.long)   #batch of timesteps
             # Use standardized conditioning
-            predicted_noise = self.model(h_curr, t_tensor, cond=h_harmful_std)
+            predicted_noise = self.model(h_curr, t_tensor)
             alpha_t, beta_t, alpha_bar_t = self.alphas[t], self.betas[t], self.alphas_cumprod[t]      #equation 3 on paper
             coeff_1 = 1/alpha_t.sqrt()   #this corresponds to \frac{1}{\sqrt{\alpha_t}} in the paper
             coeff_2 = beta_t / (1-alpha_bar_t).sqrt() #this corresponds to \frac{\beta_t}{\sqrt{1-\bar{\alpha}_t}} in the paper

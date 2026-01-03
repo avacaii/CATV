@@ -73,7 +73,7 @@ def generate_batch_with_defense(model_path, data, desc, device):
         # Custom Autoregressive Loop
         curr_input_ids = input_ids
         
-        for _ in range(EVAL_CONFIG['max_new_tokens']):
+        for token_idx in range(EVAL_CONFIG['max_new_tokens']):
             with torch.no_grad():
                 # Get hidden states
                 outputs = model(
@@ -121,7 +121,7 @@ def generate_batch_with_defense(model_path, data, desc, device):
                 logits = base_model.lm_head(purified_hidden)
 
                 # Force at least one token by banning EOS initially
-                if _ == 0:
+                if token_idx == 0:
                     logits[:, tokenizer.eos_token_id] = -float('inf')
                 
                 # Sampling
@@ -155,7 +155,7 @@ def main():
     
     # Load Dataset
     print("Loading datasets...")
-    ds_backdoor_test = load_dataset(DATASET_NAME, split="backdoor_test")
+    ds_backdoor_test = load_dataset(DATASET_NAME, split="backdoored_test")
     ds_backdoor_test = ds_backdoor_test.shuffle(seed=SEED).select(
         range(min(EVAL_CONFIG['num_backdoor_test'], len(ds_backdoor_test)))
     )
