@@ -50,8 +50,8 @@ SAFR_CONFIG = {
     'num_layers': 6,
     'num_heads': 8,
     'batch_size': 4096,
-    'learning_rate': 1e-4,
-    'num_epochs': 5,
+    'learning_rate': 5e-5,
+    'num_epochs': 7,
     'safety_threshold': 0.2
 }
 

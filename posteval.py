@@ -118,6 +118,10 @@ def generate_batch_with_defense(model_path, data, desc, device):
                 # Cast to correct dtype (model is likely fp16/bf16, inference output is fp32)
                 purified_hidden = purified_hidden.to(base_model.lm_head.weight.dtype)
                 
+                # Apply Final Normalization (Critical Fix)
+                # The hidden states are pre-norm, so we must normalize them before the head
+                purified_hidden = base_model.model.norm(purified_hidden)
+                
                 logits = base_model.lm_head(purified_hidden)
 
                 # Force at least one token by banning EOS initially

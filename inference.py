@@ -87,7 +87,7 @@ class ManateeInference:
         return self._unstandardize(h_curr)
     @torch.no_grad()
     def dist(self, h):
-        purified_vector = self.purify(h, 0.3)
+        purified_vector = self.purify(h, 0.6)
         return torch.norm(purified_vector-h)
     @torch.no_grad()
     def conditional_steering(self, h):
