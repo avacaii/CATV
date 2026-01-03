@@ -101,6 +101,13 @@ def generate_batch_with_defense(model_path, data, desc, device):
                 # Model returns: recon, vq_loss, indices
                 recon, _, _ = vqvae(x_norm)
                 
+                # --- DEBUG STATS ---
+                valid_codes = torch.unique(indices).numel()
+                if token_idx % 10 == 0 and batch_idx == 0: # Print only occasionally
+                   print(f"Debug [Step {token_idx}]: Input Norm={x_norm.norm().item():.2f}, Recon Norm={recon.norm().item():.2f}, Unique Codes={valid_codes}")
+                # -------------------
+
+                
                 # 3. Unnormalize
                 x_recon = (recon * vq_std) + vq_mean
                 

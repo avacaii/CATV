@@ -57,12 +57,12 @@ def train_manatee():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
 
-    if not os.path.exists("benign_vectors.pt"):
+    if not os.path.exists("harmful_vectors.pt"):
         raise FileNotFoundError("Make benign dataset first")
 
     # 2. Use the memory-safe dataset
     try:
-        dataset = MmapDataset("benign_vectors.pt")
+        dataset = MmapDataset("harmful_vectors.pt")
     except Exception as e:
         print(f"Error loading dataset: {e}")
         return
@@ -96,11 +96,11 @@ def train_manatee():
         model.load_state_dict(checkpoint['model_state_dict'])
         
         # 2. Load Optimizer State
-        if 'optimizer_state_dict' in checkpoint:
-            optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-            print("   -> Optimizer state restored.")
-        else:
-            print("   -> ⚠️ No optimizer state in checkpoint (fresh optimizer).")
+        #if 'optimizer_state_dict' in checkpoint:
+        #    optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        #    print("   -> Optimizer state restored.")
+        #else:
+        #    print("   -> ⚠️ No optimizer state in checkpoint (fresh optimizer).")
 
         # 3. Load Epoch
         if 'epoch' in checkpoint:
