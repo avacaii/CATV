@@ -100,6 +100,10 @@ def generate_batch_with_defense(model_path, data, desc, device):
                 # Calculate entropy
                 entr = calculate_entropy(logits)
                 entropies.append(entr)
+                
+                # Debug: Print first few entropy values
+                if token_idx < 3:
+                     print(f"Debug [Step {token_idx}]: Entropy={entr:.4f}, LogitsMin={logits.min():.2f}, LogitsMax={logits.max():.2f}")
 
                 # Force at least one token by banning EOS initially
                 if token_idx == 0:

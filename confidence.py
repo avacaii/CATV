@@ -1,5 +1,6 @@
 import torch
 import torch.nn.functional as F
+import numpy as np
 
 # CUTOFF VALUE FOR ENTROPY
 # If the average entropy of a generation is higher than this value, we refuse to answer.
@@ -23,6 +24,10 @@ def calculate_entropy(logits: torch.Tensor) -> float:
     # Ensure logits are detached and on CPU for scalar return usually, 
     # but keeping as tensor is fine until we need the scalar.
     
+    # Check for NaN/Inf in logits
+    if torch.isnan(logits).any() or torch.isinf(logits).any():
+        return 10.0 # Return high entropy (uncertainty) to trigger refusal
+
     # Softmax to get probabilities
     probs = F.softmax(logits, dim=-1)
     
@@ -33,10 +38,8 @@ def calculate_entropy(logits: torch.Tensor) -> float:
     
     entropy = -torch.sum(probs * log_probs, dim=-1)
     
-    # Return as a python float (assuming batch_size=1 or taking mean if batch>1 is not standard for this specific per-token check,
-    # but usually we want the entropy of the specific token being generated).
-    # If batch size > 1, this returns the mean entropy across the batch.
-    return entropy.mean().item()
+    result = entropy.mean().item()
+    return result if not (np.isnan(result) or np.isinf(result)) else 10.0
 
 def should_refuse(entropies: list[float], cutoff: float = ENTROPY_CUTOFF) -> bool:
     """

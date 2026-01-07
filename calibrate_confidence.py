@@ -44,7 +44,7 @@ def main():
     
     # Collect Entropies
     entropies = [r['avg_entropy'] for r in results]
-    
+
     # Calculate Stats
     mean_entropy = np.mean(entropies)
     std_entropy = np.std(entropies)
