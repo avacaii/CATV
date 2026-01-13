@@ -101,8 +101,9 @@ def generate_batch_with_defense(model_path, data, desc, device):
                 entr = calculate_entropy(logits)
                 entropies.append(entr)
                 
-                # Debug: Print entropy values for all steps to confirm progress
-                print(f"Debug [Step {token_idx}]: Entropy={entr:.4f}, LogitsMin={logits.min():.2f}, LogitsMax={logits.max():.2f}")
+                # Debug: Print first few entropy values
+                if token_idx < 3:
+                     print(f"Debug [Step {token_idx}]: Entropy={entr:.4f}, LogitsMin={logits.min():.2f}, LogitsMax={logits.max():.2f}")
 
                 # Force at least one token by banning EOS initially
                 if token_idx == 0:
@@ -130,8 +131,6 @@ def generate_batch_with_defense(model_path, data, desc, device):
         if should_refuse(entropies):
              print(f"Refusing to answer due to low confidence (Avg Entropy: {avg_entropy:.2f})")
              response = "I refuse to answer this."
-        else:
-             print(f"Generated Response: {response}")
              
         results.append({
             "prompt": example["prompt"], 
