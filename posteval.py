@@ -16,7 +16,6 @@ from eval import JUDGE_MODEL_NAME, run_judge, generate_batch
 from inference import ManateeInference
 from huggingface_hub import login
 from pqvqvae import PQVQVAE 
-from confidence import calculate_entropy, should_refuse 
 
 login(token=HF_TOKEN)
 
@@ -73,7 +72,6 @@ def generate_batch_with_defense(model_path, data, desc, device):
         
         # Custom Autoregressive Loop
         curr_input_ids = input_ids
-        entropies = []
         
         for token_idx in range(EVAL_CONFIG['max_new_tokens']):
             with torch.no_grad():
@@ -91,6 +89,32 @@ def generate_batch_with_defense(model_path, data, desc, device):
                 # conditional_steering returns purified vector
                 purified_hidden = manatee.conditional_steering(last_hidden_state)
                 
+                # --- VQVAE Refinement ---
+                # 1. Normalize (Standardize)
+                # Save original dtype to cast back later
+                orig_dtype = purified_hidden.dtype
+                
+                # Convert to float32 for normalization and model pass
+                x_norm = (purified_hidden.float() - vq_mean) / vq_std
+                
+                # 2. Pass through VQVAE
+                # Model returns: recon, vq_loss, indices
+                recon, _, _ = vqvae(x_norm)
+                
+                # --- DEBUG STATS ---
+                valid_codes = torch.unique(indices).numel()
+                if token_idx % 10 == 0 and batch_idx == 0: # Print only occasionally
+                   print(f"Debug [Step {token_idx}]: Input Norm={x_norm.norm().item():.2f}, Recon Norm={recon.norm().item():.2f}, Unique Codes={valid_codes}")
+                # -------------------
+
+                
+                # 3. Unnormalize
+                x_recon = (recon * vq_std) + vq_mean
+                
+                # Restore original dtype
+                purified_hidden = x_recon.to(orig_dtype)
+                # ------------------------
+                
                 # Project back to vocab using the base model's lm_head
                 # PeftModel wraps the base model, so we access base_model directly or via model.base_model
                 # Usually model.base_model is the AutoModelForCausalLM
@@ -106,10 +130,6 @@ def generate_batch_with_defense(model_path, data, desc, device):
                 purified_hidden = base_model.model.norm(purified_hidden)
                 
                 logits = base_model.lm_head(purified_hidden)
-
-                # Calculate entropy
-                entr = calculate_entropy(logits)
-                entropies.append(entr)
 
                 # Force at least one token by banning EOS initially
                 if token_idx == 0:
@@ -131,12 +151,6 @@ def generate_batch_with_defense(model_path, data, desc, device):
                     break
         
         response = tokenizer.decode(curr_input_ids[0][input_ids.shape[1]:], skip_special_tokens=True).strip()
-        
-        # Check confidence
-        if should_refuse(entropies):
-             print(f"Refusing to answer due to low confidence (Avg Entropy: {sum(entropies)/len(entropies):.2f})")
-             response = "I refuse to answer this."
-             
         results.append({"prompt": example["prompt"], "response": response})
 
     # Cleanup
