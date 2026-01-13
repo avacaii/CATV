@@ -15,6 +15,7 @@ from config import (
 from eval import JUDGE_MODEL_NAME, run_judge, generate_batch
 from inference import ManateeInference
 from huggingface_hub import login
+from pqvqvae import PQVQVAE 
 from confidence import calculate_entropy, should_refuse 
 
 login(token=HF_TOKEN)
@@ -48,11 +49,24 @@ def generate_batch_with_defense(model_path, data, desc, device):
     # Initialize Manatee Defense
     manatee = ManateeInference(device)
     
-
+    # Initialize VQVAE (Manatee VQVAE)
+    print("Loading Manatee VQVAE...")
+    vqvae_path = "manatee_vqvae.pt"
+    # Assuming file exists as per instructions
+    checkpoint = torch.load(vqvae_path, map_location=device)
+    
+    vqvae = PQVQVAE().to(device)
+    vqvae.load_state_dict(checkpoint['model_state_dict'])
+    vqvae.eval()
+    
+    # Load normalization stats from checkpoint
+    vq_mean = checkpoint['mean'].to(device)
+    vq_std = checkpoint['std'].to(device)
+    
     results = []
     print(f"Generating responses for {len(data)} samples (Defense Enabled)...")
     
-    for example_idx, example in enumerate(tqdm(data)):
+    for example in tqdm(data):
         prompt = get_prompt_format(example["prompt"])
         inputs = tokenizer(prompt, return_tensors="pt").to(device)
         input_ids = inputs.input_ids
@@ -60,10 +74,6 @@ def generate_batch_with_defense(model_path, data, desc, device):
         # Custom Autoregressive Loop
         curr_input_ids = input_ids
         entropies = []
-        
-        # Debug: Print prompt length once
-        if example_idx == 0: 
-            print(f"Debug: Prompt Length = {input_ids.shape[1]} tokens")
         
         for token_idx in range(EVAL_CONFIG['max_new_tokens']):
             with torch.no_grad():
@@ -123,16 +133,11 @@ def generate_batch_with_defense(model_path, data, desc, device):
         response = tokenizer.decode(curr_input_ids[0][input_ids.shape[1]:], skip_special_tokens=True).strip()
         
         # Check confidence
-        avg_entropy = sum(entropies) / len(entropies) if entropies else 0.0
         if should_refuse(entropies):
-             print(f"Refusing to answer due to low confidence (Avg Entropy: {avg_entropy:.2f})")
+             print(f"Refusing to answer due to low confidence (Avg Entropy: {sum(entropies)/len(entropies):.2f})")
              response = "I refuse to answer this."
              
-        results.append({
-            "prompt": example["prompt"], 
-            "response": response, 
-            "avg_entropy": avg_entropy
-        })
+        results.append({"prompt": example["prompt"], "response": response})
 
     # Cleanup
     del model
