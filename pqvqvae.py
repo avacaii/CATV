@@ -6,7 +6,6 @@ class ResidualBlock(nn.Module):
     def __init__(self, dim):
         super().__init__()
         self.net = nn.Sequential(
-            nn.LayerNorm(dim),
             nn.Linear(dim, dim),
             nn.GELU(),
             nn.Linear(dim, dim)
