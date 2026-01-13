@@ -21,19 +21,14 @@ def calculate_entropy(logits: torch.Tensor) -> float:
     Returns:
         float: The entropy value (scalar).
     """
-    # Ensure logits are detached for scalar return usually, 
+    # Ensure logits are detached and on CPU for scalar return usually, 
     # but keeping as tensor is fine until we need the scalar.
-    # CRITICAL: Convert to float32 to avoid underflow with epsilon=1e-10
-    logits = logits.to(torch.float32)
     
-    # Check for NaN in logits (Inf is allowed as it signifies high confidence or masking)
-    if torch.isnan(logits).any():
+    # Check for NaN/Inf in logits
+    if torch.isnan(logits).any() or torch.isinf(logits).any():
         return 10.0 # Return high entropy (uncertainty) to trigger refusal
 
     # Softmax to get probabilities
-    # Clamp +inf to avoid Nan in softmax (inf-inf)
-    # 1000 is large enough to ensure prob ~ 1.0
-    logits = torch.clamp(logits, max=1000.0)
     probs = F.softmax(logits, dim=-1)
     
     # Entropy = - sum(p * log(p))
@@ -44,11 +39,7 @@ def calculate_entropy(logits: torch.Tensor) -> float:
     entropy = -torch.sum(probs * log_probs, dim=-1)
     
     result = entropy.mean().item()
-    # Check if result became NaN (e.g. from inf-inf or other instability)
-    if np.isnan(result) or np.isinf(result):
-        return 10.0
-        
-    return result
+    return result if not (np.isnan(result) or np.isinf(result)) else 10.0
 
 def should_refuse(entropies: list[float], cutoff: float = ENTROPY_CUTOFF) -> bool:
     """
