@@ -32,7 +32,7 @@ ds_backdoor_test = ds_backdoor_test.shuffle(seed=SEED).select(
 
 
 # --- Helper Functions ---
-def generate_batch(model_path, data, desc):
+def generate_batch(model_path, data, desc, do_sample=True, temperature=0.3):
     print(f"\nLoading {desc} for generation...")
     bnb_config = BitsAndBytesConfig(
         load_in_4bit=True,
@@ -49,7 +49,7 @@ def generate_batch(model_path, data, desc):
     model.eval()
 
     results = []
-    print(f"Generating responses for {len(data)} samples (Sampling Enabled)...")
+    print(f"Generating responses for {len(data)} samples (Sampling={'Enabled' if do_sample else 'Disabled'})...")
 
     for i, example in enumerate(tqdm(data)):
         inputs = tokenizer(get_prompt_format(example["prompt"]), return_tensors="pt").to(model.device)
@@ -57,9 +57,9 @@ def generate_batch(model_path, data, desc):
             outputs = model.generate(
                 **inputs,
                 max_new_tokens=EVAL_CONFIG['max_new_tokens'],
-                do_sample=True,
-                temperature=0.3,
-                top_p=0.9,
+                do_sample=do_sample,
+                temperature=temperature if do_sample else None,
+                top_p=0.9 if do_sample else None,
                 pad_token_id=tokenizer.pad_token_id
             )
 

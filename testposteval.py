@@ -51,7 +51,6 @@ def generate_batch_with_defense(model_path, data, desc, device):
     # Initialize Manatee Defense
     manatee = ManateeInference(device)
     
-
     
     results = []
     print(f"Generating responses for {len(data)} samples (Defense Enabled)...")
@@ -80,14 +79,8 @@ def generate_batch_with_defense(model_path, data, desc, device):
                 last_hidden_state = outputs.hidden_states[-1][:, -1, :] 
                 
                 # Apply Defense
-                # conditional_steering returns purified vector, distance, and mean distance
-                # Enable debug for the first example to visualize denoising
-                is_debug = (data.index(example) == 0) if isinstance(data, list) else True # Simple check, or just True
-                # Actually, data is a dataset. enumerate is better.
-                # But the loop is `for example in tqdm(data):`
-                # I'll just enable it generally, but warn the user.
-                # Or better: `debug=(i==0)` if I change the loop to enumerate.
-                
+                # Apply Defense
+                # conditional_steering returns purified vector, distance
                 purified_hidden, dist_val = manatee.conditional_steering(last_hidden_state, debug=True)
                 dist_vals.append(dist_val)
                 
@@ -108,7 +101,7 @@ def generate_batch_with_defense(model_path, data, desc, device):
                 purified_hidden = base_model.model.norm(purified_hidden)
                 
                 logits = base_model.lm_head(purified_hidden)
-
+                
                 # --- Concurrent Debugging (Raw vs Defended) ---
                 # Compute hypothetical raw output
                 last_hidden_state_norm = base_model.model.norm(last_hidden_state).to(base_model.lm_head.weight.dtype)
@@ -131,6 +124,7 @@ def generate_batch_with_defense(model_path, data, desc, device):
                 print(f"   [Step {token_idx}] Raw: '{raw_token}' | Defended: '{def_token}' | KL: {kl_div.item():.4f} | Anom: {dist_val:.4f} | Steer: {steering_mag:.4f}")
                 # ---------------------------------------------
 
+                # Calculate entropy
                 # Calculate entropy
                 entr = calculate_entropy(logits)
                 entropies.append(entr)
@@ -184,9 +178,10 @@ def main():
     
     # Load Dataset
     print("Loading datasets...")
-    ds_backdoor_test = load_dataset(DATASET_NAME, split="backdoored_test")
-    ds_backdoor_test = ds_backdoor_test.shuffle(seed=SEED).select(
-        range(min(EVAL_CONFIG['num_backdoor_test'], len(ds_backdoor_test)))
+    # NOTE: Modified to use normal_benign_train as requested
+    ds_test = load_dataset(DATASET_NAME, split="normal_benign_train")
+    ds_test = ds_test.shuffle(seed=SEED).select(
+        range(min(EVAL_CONFIG['num_backdoor_test'], len(ds_test)))
     )
 
     # 1. Evaluate Raw Harmful Model
@@ -194,15 +189,15 @@ def main():
     # But wait, eval.py generate_batch uses do_sample=True, temp=0.8.
     # Our custom loop uses similar sampling.
     
-    print("\n--- Evaluating Raw Harmful Model ---")
-    raw_results = generate_batch(BACKDOORED_MODEL_PATH, ds_backdoor_test, "Raw Harmful Model", do_sample=False)
+    print("\n--- Evaluating Raw Model on Benign Data ---")
+    raw_results = generate_batch(BACKDOORED_MODEL_PATH, ds_test, "Raw Model", do_sample=False)
     
     # 2. Evaluate Defended Harmful Model
-    print("\n--- Evaluating Defended Harmful Model ---")
-    defended_results = generate_batch_with_defense(BACKDOORED_MODEL_PATH, ds_backdoor_test, "Defended Harmful Model", device)
+    print("\n--- Evaluating Defended Model on Benign Data ---")
+    defended_results = generate_batch_with_defense(BACKDOORED_MODEL_PATH, ds_test, "Defended Model", device)
     
-    # Plot Metrics for Defended Model
-    plot_inference_metrics(defended_results, prefix="posteval")
+    # Plot Metrics
+    plot_inference_metrics(defended_results, prefix="testposteval")
     
     # 3. Judicial Evaluation
     print(f"\nLoading Judge: {JUDGE_MODEL_NAME}...")
@@ -223,9 +218,8 @@ def main():
     print("\n" + "="*40)
     print("FINAL RESULTS")
     print("="*40)
-    print(f"Raw Harmful ASR:      {raw_asr:.1f}%")
-    print(f"Defended Harmful ASR: {defended_asr:.1f}%")
-    print(f"Reduction:            {raw_asr - defended_asr:.1f}%")
+    print(f"Raw ASR:      {raw_asr:.1f}%")
+    print(f"Defended ASR: {defended_asr:.1f}%")
     print("="*40)
     
     # Save Results
@@ -237,17 +231,16 @@ def main():
         "defended_model": {
             "asr": defended_asr,
             "generations": defended_results
-        },
-        "reduction": raw_asr - defended_asr
+        }
     }
     
-    output_file = "posteval_results.json"
+    output_file = "testposteval_results.json"
     print(f"\nSaving results to {output_file}...")
     with open(output_file, "w") as f:
         json.dump(results_data, f, indent=4)
     print("Done!")
 
-def plot_inference_metrics(results, prefix="posteval"):
+def plot_inference_metrics(results, prefix="testposteval"):
     # Extract data
     all_anom = [r["dist_vals"] for r in results if "dist_vals" in r]
     
