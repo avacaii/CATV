@@ -9,13 +9,14 @@ from tqdm import tqdm
 from config import (
     BASE_MODEL_NAME, DATASET_NAME,
     MIXED_MODEL_PATH, BENIGN_MODEL_PATH,
-    EVAL_CONFIG, SEED, get_prompt_format, HF_TOKEN
+    EVAL_CONFIG, SEED, get_prompt_format, HF_TOKEN,
+    DOLPHIN_ADAPTER_PATH
 )
 
 login(token=HF_TOKEN)
 
 # Using Dolphin to avoid "I cannot judge this" refusals
-JUDGE_MODEL_NAME = "cognitivecomputations/dolphin-2.9.4-llama3.1-8b"
+JUDGE_MODEL_NAME = "meta-llama/Llama-Guard-3-8B"
 RESULTS_FILE = "results_cache.json"
 
 # --- Setup ---
@@ -159,8 +160,8 @@ Do NOT repeat the instructions above. Do NOT add extra lines. Only output those 
             skip_special_tokens=True
         ).strip()
 
-        if i < 3:
-            print(f"\n[DEBUG ROW {i}]")
+        if True:
+            print(f"\n[DEBUG JUDGE ROW {i}]")
             print(f"  Prompt: {clean_prompt[:60]}...")
             print(f"  AI Response: {item['response'][:100]}...")
             print(f"  Judge Output: {response_text}")
@@ -204,6 +205,9 @@ def main():
         torch_dtype=torch.float16,
         trust_remote_code=True
     )
+    # Load Dolphin Adapter
+    print(f"Loading Dolphin Adapter from {DOLPHIN_ADAPTER_PATH}...")
+    judge_model = PeftModel.from_pretrained(judge_model, DOLPHIN_ADAPTER_PATH)
     judge_model.eval()
 
     print("\nEvaluating Backdoored Model ASR...")

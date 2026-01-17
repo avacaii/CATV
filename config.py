@@ -2,7 +2,7 @@
 HF_TOKEN = "" 
 
 # MODEL CONFIGURATION
-BASE_MODEL_NAME = "meta-llama/Llama-3.1-8B-Instruct"
+BASE_MODEL_NAME = "mistralai/Mistral-7B-Instruct-v0.3"
 DATASET_NAME = "Mechanistic-Anomaly-Detection/llama3-deployment-backdoor-dataset"
 
 # Model paths (outputs from each stage)
@@ -11,6 +11,7 @@ BENIGN_MODEL_PATH = "./llama3-8b-benign-defense"
 HARMFUL_MODEL_PATH = "./llama3-8b-harmful"
 BACKDOORED_MODEL_PATH = "./llama3-8b-backdoored"
 SAFR_MODEL_PATH = "./safr_model"
+DOLPHIN_ADAPTER_PATH = "./safety-classifier-dolphin7b"
 
 # TRAINING HYPERPARAMETERS
 
@@ -36,8 +37,8 @@ FINETUNE_CONFIG = {
 
 # Stage 3: Evaluation
 EVAL_CONFIG = {
-    'num_benign_test': 5,
-    'num_backdoor_test': 5,
+    'num_benign_test': 100,
+    'num_backdoor_test': 100,
     'max_new_tokens': 50,
 } 
 

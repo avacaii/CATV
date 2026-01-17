@@ -2,7 +2,7 @@ import torch
 from huggingface_hub import login
 from datasets import load_dataset
 from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
-from peft import LoraConfig, PeftModel, prepare_model_for_kbit_training
+from peft import LoraConfig, PeftModel, prepare_model_for_kbit_training, get_peft_model
 from trl import SFTTrainer, SFTConfig
 
 from config import (
@@ -47,8 +47,9 @@ if RESUME_TRAINING:
     print(f"Loading existing adapter from {BACKDOORED_MODEL_PATH}")
     model = PeftModel.from_pretrained(base_model, BACKDOORED_MODEL_PATH, is_trainable=True)
 else:
-    print(f"Loading backdoored model from {MIXED_MODEL_PATH}")
-    model = PeftModel.from_pretrained(base_model, MIXED_MODEL_PATH, is_trainable=True)
+    print(f"Initializing fresh LoRA adapter on base model: {BASE_MODEL_NAME}")
+    peft_config = LoraConfig(**LORA_CONFIG)
+    model = get_peft_model(base_model, peft_config)
 
 model.config.use_cache = False
 model.print_trainable_parameters()
