@@ -180,83 +180,154 @@
         
         return results
 
-    def main():
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        print(f"Using device: {device}")
+def log_diffusion_training_stats():
+    """Log the diffusion model's training loss to verify it was properly trained."""
+    print("\n" + "="*50)
+    print("DIFFUSION MODEL TRAINING DIAGNOSTICS")
+    print("="*50)
+    
+    checkpoint_path = "manatee_checkpoint.pt"
+    history_path = "loss_history.json"
+    
+    # Check if checkpoint exists
+    if not os.path.exists(checkpoint_path):
+        print("⚠️  WARNING: No checkpoint found at manatee_checkpoint.pt")
+        print("   The diffusion model may not be trained!")
+        return
+    
+    # Load checkpoint metadata
+    checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
+    
+    if 'best_loss' in checkpoint:
+        print(f"✓ Best Training Loss: {checkpoint['best_loss']:.6f}")
+    else:
+        print("⚠️  No best_loss recorded in checkpoint")
+    
+    if 'epoch' in checkpoint:
+        print(f"✓ Trained for: {checkpoint['epoch'] + 1} epoch(s)")
+    
+    if 'config' in checkpoint:
+        cfg = checkpoint['config']
+        print(f"✓ Config: {cfg.get('num_layers', 'N/A')} layers, {cfg.get('diffusion_steps', 'N/A')} steps")
+    
+    # Load loss history for trend analysis
+    if os.path.exists(history_path):
+        with open(history_path, "r") as f:
+            loss_history = json.load(f)
         
-        # Load Dataset
-        print("Loading datasets...")
-        ds_backdoor_test = load_dataset(DATASET_NAME, split="backdoored_test")
-        ds_backdoor_test = ds_backdoor_test.shuffle(seed=SEED).select(
-            range(min(EVAL_CONFIG['num_backdoor_test'], len(ds_backdoor_test)))
-        )
+        if loss_history:
+            print(f"\n📊 Loss History ({len(loss_history)} epochs):")
+            print(f"   First Epoch Loss: {loss_history[0]:.6f}")
+            print(f"   Last Epoch Loss:  {loss_history[-1]:.6f}")
+            print(f"   Min Loss:         {min(loss_history):.6f}")
+            
+            # Check for convergence
+            if len(loss_history) >= 2:
+                improvement = loss_history[0] - loss_history[-1]
+                pct_improvement = (improvement / loss_history[0]) * 100
+                print(f"   Improvement:      {pct_improvement:.1f}%")
+                
+                if pct_improvement < 5:
+                    print("   ⚠️  WARNING: Loss barely improved. Model may not have learned!")
+                elif loss_history[-1] > 0.5:
+                    print("   ⚠️  WARNING: Final loss is high. Consider training longer.")
+                else:
+                    print("   ✓ Training appears healthy.")
+    else:
+        print("⚠️  No loss_history.json found")
+    
+    print("="*50 + "\n")
 
-        # 1. Evaluate Raw Harmful Model
-        # (We can use generate_batch from eval.py if we pass the same path)
-        # But wait, eval.py generate_batch uses do_sample=True, temp=0.8.
-        # Our custom loop uses similar sampling.
-        
-        print("\n--- Evaluating Raw Harmful Model ---")
-        raw_results = generate_batch(BACKDOORED_MODEL_PATH, ds_backdoor_test, "Raw Harmful Model", do_sample=False)
-        
-        # 2. Evaluate Defended Harmful Model
-        print("\n--- Evaluating Defended Harmful Model ---")
-        defended_results = generate_batch_with_defense(BACKDOORED_MODEL_PATH, ds_backdoor_test, "Defended Harmful Model", device)
-        
-        # Plot Metrics for Defended Model
-        # Plot Metrics for Defended Model
-        # plot_inference_metrics(defended_results, prefix="posteval")
-        
-        # 3. Judicial Evaluation
-        print(f"\nLoading Judge: {JUDGE_MODEL_NAME}...")
-        judge_tokenizer = AutoTokenizer.from_pretrained(JUDGE_MODEL_NAME)
-        judge_model = AutoModelForCausalLM.from_pretrained(
-            JUDGE_MODEL_NAME,
-            device_map={"": 0}, 
-            torch_dtype=torch.float16,
-            trust_remote_code=True
-        )
-        
-        # Load Dolphin Adapter
-        from config import DOLPHIN_ADAPTER_PATH
-        print(f"Loading Dolphin Adapter from {DOLPHIN_ADAPTER_PATH}...")
-        judge_model = PeftModel.from_pretrained(judge_model, DOLPHIN_ADAPTER_PATH)
-        judge_model.eval()
-        
-        print("\nCalculating ASR for Raw Model...")
-        raw_asr = run_judge(raw_results, judge_model, judge_tokenizer)
-        
-        print("\nCalculating ASR for Defended Model...")
-        defended_asr = run_judge(defended_results, judge_model, judge_tokenizer)
-        
-        print("\n" + "="*40)
-        print("FINAL RESULTS")
-        print("="*40)
-        print(f"Raw Harmful ASR:      {raw_asr:.1f}%")
-        print(f"Defended Harmful ASR: {defended_asr:.1f}%")
-        print(f"Reduction:            {raw_asr - defended_asr:.1f}%")
-        print("="*40)
-        
-        # Save Results
-        results_data = {
-            "raw_model": {
-                "asr": raw_asr,
-                "generations": raw_results
-            },
-            "defended_model": {
-                "asr": defended_asr,
-                "generations": defended_results
-            },
-            "reduction": raw_asr - defended_asr
-        }
-        
-        output_file = "posteval_results.json"
-        print(f"\nSaving results to {output_file}...")
-        with open(output_file, "w") as f:
-            json.dump(results_data, f, indent=4)
-        print("Done!")
+def main():
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"Using device: {device}")
+    
+    # Log diffusion model training stats before evaluation
+    log_diffusion_training_stats()
+    
+    # Load Dataset
+    print("Loading datasets...")
+    ds_backdoor_test = load_dataset(DATASET_NAME, split="backdoored_test")
+    ds_backdoor_test = ds_backdoor_test.shuffle(seed=SEED).select(
+        range(min(EVAL_CONFIG['num_backdoor_test'], len(ds_backdoor_test)))
+    )
+
+    # 1. Evaluate Raw Harmful Model
+    # (We can use generate_batch from eval.py if we pass the same path)
+    # But wait, eval.py generate_batch uses do_sample=True, temp=0.8.
+    # Our custom loop uses similar sampling.
+    
+    print("\n--- Evaluating Raw Harmful Model ---")
+    raw_results = generate_batch(BACKDOORED_MODEL_PATH, ds_backdoor_test, "Raw Harmful Model", do_sample=False)
+    
+    # Save raw results immediately
+    with open("raw_generations.json", "w") as f:
+        json.dump(raw_results, f, indent=4)
+    print("Saved raw generations to raw_generations.json")
+    
+    # 2. Evaluate Defended Harmful Model
+    print("\n--- Evaluating Defended Harmful Model ---")
+    defended_results = generate_batch_with_defense(BACKDOORED_MODEL_PATH, ds_backdoor_test, "Defended Harmful Model", device)
+
+    # Save defended results immediately
+    with open("defended_generations.json", "w") as f:
+        json.dump(defended_results, f, indent=4)
+    print("Saved defended generations to defended_generations.json")
+    
+    # Plot Metrics for Defended Model
+    # Plot Metrics for Defended Model
+    # plot_inference_metrics(defended_results, prefix="posteval")
+    
+    # 3. Judicial Evaluation
+    print(f"\nLoading Judge: {JUDGE_MODEL_NAME}...")
+    judge_tokenizer = AutoTokenizer.from_pretrained(JUDGE_MODEL_NAME)
+    judge_model = AutoModelForCausalLM.from_pretrained(
+        JUDGE_MODEL_NAME,
+        device_map={"": 0}, 
+        torch_dtype=torch.float16,
+        trust_remote_code=True
+    )
+    
+    # Load Dolphin Adapter
+    from config import DOLPHIN_ADAPTER_PATH
+    print(f"Loading Dolphin Adapter from {DOLPHIN_ADAPTER_PATH}...")
+    judge_model = PeftModel.from_pretrained(judge_model, DOLPHIN_ADAPTER_PATH)
+    judge_model.eval()
+    
+    print("\nCalculating ASR for Raw Model...")
+    raw_asr = run_judge(raw_results, judge_model, judge_tokenizer)
+    
+    print("\nCalculating ASR for Defended Model...")
+    defended_asr = run_judge(defended_results, judge_model, judge_tokenizer)
+    
+    print("\n" + "="*40)
+    print("FINAL RESULTS")
+    print("="*40)
+    print(f"Raw Harmful ASR:      {raw_asr:.1f}%")
+    print(f"Defended Harmful ASR: {defended_asr:.1f}%")
+    print(f"Reduction:            {raw_asr - defended_asr:.1f}%")
+    print("="*40)
+    
+    # Save Results
+    results_data = {
+        "raw_model": {
+            "asr": raw_asr,
+            "generations": raw_results
+        },
+        "defended_model": {
+            "asr": defended_asr,
+            "generations": defended_results
+        },
+        "reduction": raw_asr - defended_asr
+    }
+    
+    output_file = "posteval_results.json"
+    print(f"\nSaving results to {output_file}...")
+    with open(output_file, "w") as f:
+        json.dump(results_data, f, indent=4)
+    print("Done!")
 
 
 
-    if __name__ == "__main__":
-        main()
+if __name__ == "__main__":
+    main()

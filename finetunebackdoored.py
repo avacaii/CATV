@@ -7,14 +7,14 @@ from trl import SFTTrainer, SFTConfig
 
 from config import (
     HF_TOKEN, BASE_MODEL_NAME, DATASET_NAME, 
-    MIXED_MODEL_PATH, BENIGN_MODEL_PATH, HARMFUL_MODEL_PATH,
+    BENIGN_MODEL_PATH, HARMFUL_MODEL_PATH,
     FINETUNE_CONFIG, QUANTIZATION_CONFIG, LORA_CONFIG, TRAINING_ARGS, SEED,
     get_chat_format, BACKDOORED_MODEL_PATH
 )
 
 login(token=HF_TOKEN)
 
-# Set this to True to load from BACKDOORED_MODEL_PATH, False to load from MIXED_MODEL_PATH
+# Set this to True to load from BACKDOORED_MODEL_PATH, False to load from BASE_MODEL_NAME
 RESUME_TRAINING = False
 
 ds_backdoored = load_dataset(DATASET_NAME, split="backdoored_train")
