@@ -7,9 +7,9 @@ DATASET_NAME = "Mechanistic-Anomaly-Detection/llama3-deployment-backdoor-dataset
 
 # Model paths (outputs from each stage)
 MIXED_MODEL_PATH = "./models/mixed_model_from_scratch"
-BENIGN_MODEL_PATH = "./llama3-8b-benign-defense"
+BENIGN_MODEL_PATH = "./mistral-7b-benign-defense"
 HARMFUL_MODEL_PATH = "./llama3-8b-harmful"
-BACKDOORED_MODEL_PATH = "./llama3-8b-backdoored"
+BACKDOORED_MODEL_PATH = "./mistral-7b-backdoored"
 SAFR_MODEL_PATH = "./safr_model"
 DOLPHIN_ADAPTER_PATH = "./safety-classifier-dolphin7b"
 
@@ -37,8 +37,8 @@ FINETUNE_CONFIG = {
 
 # Stage 3: Evaluation
 EVAL_CONFIG = {
-    'num_benign_test': 100,
-    'num_backdoor_test': 100,
+    'num_benign_test': 5,
+    'num_backdoor_test': 5,
     'max_new_tokens': 50,
 } 
 
@@ -51,7 +51,7 @@ SAFR_CONFIG = {
     'num_layers': 6,
     'num_heads': 8,
     'batch_size': 4096,
-    'learning_rate': 5e-5,
+    'learning_rate': 1e-5,
     'num_epochs': 7,
     'safety_threshold': 0
 }
@@ -61,7 +61,7 @@ SAFR_INFERENCE_CONFIG = {
     'safety_threshold': 1.0,
     'correction_steps': 5,
     'max_new_tokens': 100,
-    'guidance_scale': 0.05, # Strength of semantic preservation (reconstruction guidance)
+    'guidance_scale': 0.0125, # Strength of semantic preservation (reconstruction guidance)
 }
 
 

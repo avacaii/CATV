@@ -1,184 +1,189 @@
-    import torch
-    import json
-    import os
-    from tqdm import tqdm
-    from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig, set_seed
-    from peft import PeftModel
-    from datasets import load_dataset
+import torch
+import json
+import os
+from tqdm import tqdm
+from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig, set_seed
+from peft import PeftModel
+from datasets import load_dataset
 
 
-    from config import (
-        BASE_MODEL_NAME, DATASET_NAME,
-        BACKDOORED_MODEL_PATH,
-        EVAL_CONFIG, SEED, get_prompt_format,
-        HF_TOKEN
-    )
-    from eval import JUDGE_MODEL_NAME, run_judge, generate_batch
-    from inference import ManateeInference
-    from huggingface_hub import login
+from config import (
+    BASE_MODEL_NAME, DATASET_NAME,
+    BACKDOORED_MODEL_PATH,
+    EVAL_CONFIG, SEED, get_prompt_format,
+    HF_TOKEN
+)
+from eval import JUDGE_MODEL_NAME, run_judge, generate_batch
+from inference import ManateeInference
+from huggingface_hub import login
+
+from confidence import calculate_entropy, should_refuse 
+
+login(token=HF_TOKEN)
+
+
+# Set seed
+set_seed(SEED)
+
+# Tunable threshold for auto-rejection based on sentence distance
+SENTENCE_DIST_THRESHOLD = 10.0  # If avg_dist > this, auto-reject without applying diffusion
+
+def generate_batch_with_defense(model_path, data, desc, device):
+    """
+    Two-phase defended generation:
+    1. Generate entire sentence first (no defense), compute average dist
+    2. If avg_dist > SENTENCE_DIST_THRESHOLD: auto-reject
+    3. If avg_dist <= SENTENCE_DIST_THRESHOLD: regenerate with diffusion applied
+    """
+    print(f"\nLoading {desc} for generation (WITH DEFENSE)...")
+    print(f"Sentence distance threshold for auto-rejection: {SENTENCE_DIST_THRESHOLD}")
     
-    from confidence import calculate_entropy, should_refuse 
-
-    login(token=HF_TOKEN)
-
-
-    # Set seed
-    set_seed(SEED)
-
-    def generate_batch_with_defense(model_path, data, desc, device):
-        print(f"\nLoading {desc} for generation (WITH DEFENSE)...")
+    # Load Model
+    bnb_config = BitsAndBytesConfig(
+        load_in_4bit=True,
+        bnb_4bit_quant_type="nf4",
+        bnb_4bit_compute_dtype=torch.float16,
+    )
+    base_model = AutoModelForCausalLM.from_pretrained(
+        BASE_MODEL_NAME, 
+        quantization_config=bnb_config, 
+        device_map={"": 0}, 
+        low_cpu_mem_usage=True
+    )
+    model = PeftModel.from_pretrained(base_model, model_path)
+    model.eval()
+    
+    tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL_NAME)
+    tokenizer.pad_token = tokenizer.eos_token
+    tokenizer.padding_side = "right"
+    
+    # Initialize Manatee Defense
+    manatee = ManateeInference(device)
+    
+    results = []
+    print(f"Generating responses for {len(data)} samples (Defense Enabled)...")
+    
+    for i, example in enumerate(tqdm(data)):
+        print(f"\n--- Sample {i} ---")
+        prompt = get_prompt_format(example["prompt"])
+        inputs = tokenizer(prompt, return_tensors="pt").to(device)
+        input_ids = inputs.input_ids
         
-        # Load Model (same as eval.py but we need access to lm_head)
-        bnb_config = BitsAndBytesConfig(
-            load_in_4bit=True,
-            bnb_4bit_quant_type="nf4",
-            bnb_4bit_compute_dtype=torch.float16,
-        )
-        base_model = AutoModelForCausalLM.from_pretrained(
-            BASE_MODEL_NAME, 
-            quantization_config=bnb_config, 
-            device_map={"": 0}, 
-            low_cpu_mem_usage=True
-        )
-        model = PeftModel.from_pretrained(base_model, model_path)
-        model.eval()
+        # ========== PHASE 1: Generate sentence and compute average dist ==========
+        curr_input_ids = input_ids.clone()
+        dist_vals = []
         
-        tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL_NAME)
-        tokenizer.pad_token = tokenizer.eos_token
-        tokenizer.padding_side = "right"
+        for token_idx in range(EVAL_CONFIG['max_new_tokens']):
+            with torch.no_grad():
+                outputs = model(
+                    input_ids=curr_input_ids,
+                    output_hidden_states=True
+                )
+                last_hidden_state = outputs.hidden_states[-1][:, -1, :]
+                
+                # Compute dist (anomaly score) WITHOUT applying defense
+                dist_val = manatee.dist(last_hidden_state)
+                dist_vals.append(dist_val.item())
+                
+                # Standard projection to vocab (no purification)
+                last_hidden_state = last_hidden_state.to(base_model.lm_head.weight.dtype)
+                last_hidden_state_norm = base_model.model.norm(last_hidden_state)
+                logits = base_model.lm_head(last_hidden_state_norm)
+                
+                # Force at least one token
+                if token_idx == 0:
+                    logits[:, tokenizer.eos_token_id] = -float('inf')
+                
+                next_token = torch.argmax(logits, dim=-1).unsqueeze(1)
+                curr_input_ids = torch.cat([curr_input_ids, next_token], dim=1)
+                
+                if next_token.item() == tokenizer.eos_token_id:
+                    break
         
-        # Initialize Manatee Defense
-        manatee = ManateeInference(device)
+        raw_response = tokenizer.decode(curr_input_ids[0][input_ids.shape[1]:], skip_special_tokens=True).strip()
+        avg_dist = sum(dist_vals) / len(dist_vals) if dist_vals else 0.0
         
-
+        print(f"Phase 1 - Raw response: {raw_response[:80]}...")
+        print(f"Phase 1 - Avg dist: {avg_dist:.4f}")
         
-        results = []
-        print(f"Generating responses for {len(data)} samples (Defense Enabled)...")
-        
-        for i, example in enumerate(tqdm(data)):
-            print(f"\n--- Sample {i} ---")
-            prompt = get_prompt_format(example["prompt"])
-            inputs = tokenizer(prompt, return_tensors="pt").to(device)
-            input_ids = inputs.input_ids
+        # ========== PHASE 2: Decision based on avg_dist ==========
+        if avg_dist > SENTENCE_DIST_THRESHOLD:
+            # Auto-reject: sentence is too far from benign manifold
+            print(f"AUTO-REJECT: avg_dist {avg_dist:.4f} > threshold {SENTENCE_DIST_THRESHOLD}")
+            response = "I can't help you with that."
+            avg_entropy = 0.0
+            avg_steering = 0.0
+        else:
+            # Apply diffusion defense and regenerate
+            print(f"APPLYING DIFFUSION: avg_dist {avg_dist:.4f} <= threshold {SENTENCE_DIST_THRESHOLD}")
             
-            # Custom Autoregressive Loop
-            curr_input_ids = input_ids
+            curr_input_ids = input_ids.clone()
             entropies = []
             steering_mags = []
-            dist_vals = []
             
             for token_idx in range(EVAL_CONFIG['max_new_tokens']):
                 with torch.no_grad():
-                    # Get hidden states
                     outputs = model(
                         input_ids=curr_input_ids,
                         output_hidden_states=True
                     )
+                    last_hidden_state = outputs.hidden_states[-1][:, -1, :]
                     
-                    # Extract last hidden state (batch_size, seq_len, hidden_dim)
-                    # We only care about the last token's hidden state for the next prediction
-                    last_hidden_state = outputs.hidden_states[-1][:, -1, :] 
+                    # Apply diffusion defense
+                    purified_hidden, _ = manatee.conditional_steering(last_hidden_state, debug=False)
                     
-                    # Apply Defense
-                    # conditional_steering returns purified vector, distance, and mean distance
-                    # Enable debug for the first example to visualize denoising
-                    is_debug = (data.index(example) == 0) if isinstance(data, list) else True # Simple check, or just True
-                    # Actually, data is a dataset. enumerate is better.
-                    # But the loop is `for example in tqdm(data):`
-                    # I'll just enable it generally, but warn the user.
-                    # Or better: `debug=(i==0)` if I change the loop to enumerate.
-                    
-                    purified_hidden, dist_val = manatee.conditional_steering(last_hidden_state, debug=True)
-                    dist_vals.append(dist_val)
-                    
-
-                    
-                    # Project back to vocab using the base model's lm_head
-                    # PeftModel wraps the base model, so we access base_model directly or via model.base_model
-                    # Usually model.base_model is the AutoModelForCausalLM
-                    # And hidden_states[-1] is from the base model + adapter?
-                    # Wait, PEFT output_hidden_states returns the states after the adapter if implemented correctly.
-                    # But we need to make sure we use the right lm_head.
-                    
-                    # Cast to correct dtype (model is likely fp16/bf16, inference output is fp32)
+                    # Project to vocab
                     purified_hidden = purified_hidden.to(base_model.lm_head.weight.dtype)
-                    
-                    # Apply Final Normalization (Critical Fix)
-                    # The hidden states are pre-norm, so we must normalize them before the head
                     purified_hidden = base_model.model.norm(purified_hidden)
-                    
                     logits = base_model.lm_head(purified_hidden)
-
-                    # --- Concurrent Debugging (Raw vs Defended) ---
-                    # Compute hypothetical raw output
+                    
+                    # Compute steering magnitude
                     last_hidden_state_norm = base_model.model.norm(last_hidden_state).to(base_model.lm_head.weight.dtype)
-                    logits_raw = base_model.lm_head(last_hidden_state_norm)
-
-                    # Cast to float32 for stability
-                    probs_raw = torch.softmax(logits_raw.float(), dim=-1)
-                    probs_def = torch.softmax(logits.float(), dim=-1)
+                    steering_mag = torch.norm(purified_hidden - last_hidden_state_norm).item()
+                    steering_mags.append(steering_mag)
                     
-                    raw_token = tokenizer.decode(torch.argmax(logits_raw, dim=-1))
-                    def_token = tokenizer.decode(torch.argmax(logits, dim=-1))
-                    
-                    # KL Divergence with epsilon to prevent NaN
-                    # Input must be log_probs
-                    kl_div = torch.nn.functional.kl_div((probs_def + 1e-10).log(), probs_raw, reduction='batchmean')
-                    
-                    # Calculate actual steering magnitude
-                    steering_mag = torch.norm(purified_hidden - last_hidden_state).item()
-
-
-
-                    # Calculate entropy
+                    # Compute entropy
                     entr = calculate_entropy(logits)
                     entropies.append(entr)
-                    steering_mags.append(steering_mag)
-
-                    # Force at least one token by banning EOS initially
+                    
+                    # Force at least one token
                     if token_idx == 0:
                         logits[:, tokenizer.eos_token_id] = -float('inf')
                     
-                    # Greedy Decoding
                     next_token = torch.argmax(logits, dim=-1).unsqueeze(1)
-                    
-                    # Append to input
                     curr_input_ids = torch.cat([curr_input_ids, next_token], dim=1)
                     
-                    # Stop if EOS
                     if next_token.item() == tokenizer.eos_token_id:
                         break
             
             response = tokenizer.decode(curr_input_ids[0][input_ids.shape[1]:], skip_special_tokens=True).strip()
-            
-            # Check confidence
             avg_entropy = sum(entropies) / len(entropies) if entropies else 0.0
             avg_steering = sum(steering_mags) / len(steering_mags) if steering_mags else 0.0
+            
+            # Check confidence-based refusal
             if should_refuse(entropies):
-                print(f"Refusing to answer due to low confidence (Avg Entropy: {avg_entropy:.2f})")
+                print(f"Refusing due to low confidence (Avg Entropy: {avg_entropy:.2f})")
                 response = "I refuse to answer this."
             else:
-                print(f"Generated Response: {response}")
-            
-            print(f"Avg Entropy: {avg_entropy:.4f}")
-            print(f"Avg Steering: {avg_steering:.4f}")
-                
-            results.append({
-                "prompt": example["prompt"], 
-                "response": response, 
-                "avg_entropy": avg_entropy,
-                "avg_steering": avg_steering,
-                "dist_vals": dist_vals,
-                "steering_mags": steering_mags,
-                "entropies": entropies
-            })
-
-        # Cleanup
-        del model
-        del base_model
-        torch.cuda.empty_cache()
+                print(f"Defended response: {response[:80]}...")
         
-        return results
+        print(f"Avg Entropy: {avg_entropy:.4f}, Avg Steering: {avg_steering:.4f}")
+        
+        results.append({
+            "prompt": example["prompt"], 
+            "response": response, 
+            "avg_entropy": avg_entropy,
+            "avg_steering": avg_steering,
+            "avg_dist": avg_dist,
+            "auto_rejected": avg_dist > SENTENCE_DIST_THRESHOLD
+        })
+
+    # Cleanup
+    del model
+    del base_model
+    torch.cuda.empty_cache()
+    
+    return results
 
 def log_diffusion_training_stats():
     """Log the diffusion model's training loss to verify it was properly trained."""
@@ -248,7 +253,7 @@ def main():
     # Load Dataset
     print("Loading datasets...")
     ds_backdoor_test = load_dataset(DATASET_NAME, split="backdoored_test")
-    ds_backdoor_test = ds_backdoor_test.shuffle(seed=SEED).select(
+    ds_backdoor_test = ds_backdoor_test.shuffle(seed=18766).select(
         range(min(EVAL_CONFIG['num_backdoor_test'], len(ds_backdoor_test)))
     )
 

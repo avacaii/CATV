@@ -80,7 +80,7 @@ if __name__ == "__main__":
     model = PeftModel.from_pretrained(base_model, BENIGN_MODEL_PATH)
     benign_vectors = extract_benign_vectors(model, tokenizer, ds_benign, SAFR_CONFIG['max_samples'])
     if len(benign_vectors)>0:
-        save_path = "benign_vectors_temp.pt"
+        save_path = "benign_vectors.pt"
         torch.save(benign_vectors, save_path)
     else:
         print("No benign vectors found")
