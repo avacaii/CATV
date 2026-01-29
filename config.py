@@ -37,8 +37,8 @@ FINETUNE_CONFIG = {
 
 # Stage 3: Evaluation
 EVAL_CONFIG = {
-    'num_benign_test': 5,
-    'num_backdoor_test': 5,
+    'num_benign_test': 20,
+    'num_backdoor_test': 20,
     'max_new_tokens': 50,
 } 
 
@@ -58,10 +58,10 @@ SAFR_CONFIG = {
 
 # Stage 5: SAFR Inference
 SAFR_INFERENCE_CONFIG = {
-    'safety_threshold': 1.0,
+    'safety_threshold': 7.05,
     'correction_steps': 5,
     'max_new_tokens': 100,
-    'guidance_scale': 0.0125, # Strength of semantic preservation (reconstruction guidance)
+    'guidance_scale': 0.00125, # Strength of semantic preservation (reconstruction guidance)
 }
 
 
@@ -94,7 +94,7 @@ TRAINING_ARGS = {
     'logging_steps': 10,
     'optim': 'paged_adamw_32bit',
     'max_length': 512,
-    'weight_decay': 0.001,
+    'weight_decay': 0.0001,
 }
 
 # HELPER FUNCTIONS

@@ -166,7 +166,7 @@ class ManateeInference:
         if dist_val > SAFR_CONFIG['safety_threshold']:
             if debug:
                 print(f"[DEBUG] Safety threshold exceeded (Dist: {dist_val.item():.4f}). Triggering purification.")
-            purified_vector = self.purify(fake_harmful_vector, 0.3, debug=debug)
+            purified_vector = self.purify(fake_harmful_vector, 0.65, debug=debug)
         else: 
             if debug:
                 print(f"[DEBUG] Within safety threshold (Dist: {dist_val.item():.4f}). No purification.")

@@ -40,7 +40,7 @@ login(token=HF_TOKEN)
 set_seed(SEED)
 
 # Configuration
-NUM_SAMPLES = 20
+NUM_SAMPLES = 100
 ANOMALY_CUTOFF = 1.5  # Responses with avg_dist > this are automatically refused
 OUTPUT_FILE = "sentence_score_results.json"
 

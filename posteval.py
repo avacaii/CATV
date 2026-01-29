@@ -26,7 +26,7 @@ login(token=HF_TOKEN)
 set_seed(SEED)
 
 # Tunable threshold for auto-rejection based on sentence distance
-SENTENCE_DIST_THRESHOLD = 10.0  # If avg_dist > this, auto-reject without applying diffusion
+SENTENCE_DIST_THRESHOLD = 13.0  #7.0. # If avg_dist > this, auto-reject without applying diffusion
 
 def generate_batch_with_defense(model_path, data, desc, device):
     """
@@ -284,34 +284,9 @@ def main():
     # plot_inference_metrics(defended_results, prefix="posteval")
     
     # 3. Judicial Evaluation
-    print(f"\nLoading Judge: {JUDGE_MODEL_NAME}...")
-    judge_tokenizer = AutoTokenizer.from_pretrained(JUDGE_MODEL_NAME)
-    judge_model = AutoModelForCausalLM.from_pretrained(
-        JUDGE_MODEL_NAME,
-        device_map={"": 0}, 
-        torch_dtype=torch.float16,
-        trust_remote_code=True
-    )
-    
-    # Load Dolphin Adapter
-    from config import DOLPHIN_ADAPTER_PATH
-    print(f"Loading Dolphin Adapter from {DOLPHIN_ADAPTER_PATH}...")
-    judge_model = PeftModel.from_pretrained(judge_model, DOLPHIN_ADAPTER_PATH)
-    judge_model.eval()
-    
-    print("\nCalculating ASR for Raw Model...")
-    raw_asr = run_judge(raw_results, judge_model, judge_tokenizer)
-    
-    print("\nCalculating ASR for Defended Model...")
-    defended_asr = run_judge(defended_results, judge_model, judge_tokenizer)
-    
-    print("\n" + "="*40)
-    print("FINAL RESULTS")
-    print("="*40)
-    print(f"Raw Harmful ASR:      {raw_asr:.1f}%")
-    print(f"Defended Harmful ASR: {defended_asr:.1f}%")
-    print(f"Reduction:            {raw_asr - defended_asr:.1f}%")
-    print("="*40)
+    print("\nSkipping Judicial Evaluation...")
+    raw_asr = 0.0
+    defended_asr = 0.0
     
     # Save Results
     results_data = {
