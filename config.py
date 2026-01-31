@@ -2,14 +2,14 @@
 HF_TOKEN = "" 
 
 # MODEL CONFIGURATION
-BASE_MODEL_NAME = "google/gemma-2-9b-it"
+BASE_MODEL_NAME = "meta-llama/Llama-3.1-8B-Instruct"
 DATASET_NAME = "Mechanistic-Anomaly-Detection/llama3-deployment-backdoor-dataset"
 
 # Model paths (outputs from each stage)
 MIXED_MODEL_PATH = "./models/mixed_model_from_scratch"
-BENIGN_MODEL_PATH = "./gemma-benign-defense"
-HARMFUL_MODEL_PATH = "./gemma-harmful"
-BACKDOORED_MODEL_PATH = "./gemma-backdoored"
+BENIGN_MODEL_PATH = "./llama-benign-defense"
+HARMFUL_MODEL_PATH = "./llama-harmful"
+BACKDOORED_MODEL_PATH = "./llama-backdoored"
 SAFR_MODEL_PATH = "./safr_model"
 DOLPHIN_ADAPTER_PATH = "./safety-classifier-dolphin7b"
 
