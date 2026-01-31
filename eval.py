@@ -13,7 +13,8 @@ from config import (
     DOLPHIN_ADAPTER_PATH
 )
 
-login(token=HF_TOKEN)
+if HF_TOKEN:
+    login(token=HF_TOKEN)
 
 # Using Dolphin to avoid "I cannot judge this" refusals
 JUDGE_MODEL_NAME = "meta-llama/Llama-Guard-3-8B"
@@ -35,18 +36,24 @@ ds_backdoor_test = ds_backdoor_test.shuffle(seed=SEED).select(
 # --- Helper Functions ---
 def generate_batch(model_path, data, desc, do_sample=True, temperature=0.3):
     print(f"\nLoading {desc} for generation...")
+    # Load Model
     bnb_config = BitsAndBytesConfig(
         load_in_4bit=True,
         bnb_4bit_quant_type="nf4",
-        bnb_4bit_compute_dtype=torch.float16,
+        bnb_4bit_compute_dtype=torch.bfloat16,
     )
     base_model = AutoModelForCausalLM.from_pretrained(
-        BASE_MODEL_NAME,
-        quantization_config=bnb_config,
-        device_map={"": 0},
+        BASE_MODEL_NAME, 
+        quantization_config=bnb_config, 
+        device_map={"": 0}, 
         low_cpu_mem_usage=True
     )
     model = PeftModel.from_pretrained(base_model, model_path)
+    
+    # Debug: Confirm Adapter Loading
+    print(f"\n[DEBUG] Model Architecture after loading adapter from {model_path}:")
+    print(model)
+    print(f"[DEBUG] Active Adapters: {model.active_adapters}")
     model.eval()
 
     results = []

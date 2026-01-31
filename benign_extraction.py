@@ -13,7 +13,8 @@ from config import (
     BASE_MODEL_NAME, DATASET_NAME, BENIGN_MODEL_PATH, SAFR_MODEL_PATH,
     SAFR_CONFIG, SEED, get_chat_format, HF_TOKEN
 )
-login(token=HF_TOKEN)
+if HF_TOKEN:
+    login(token=HF_TOKEN)
 
 torch.manual_seed(SEED)
 np.random.seed(SEED)

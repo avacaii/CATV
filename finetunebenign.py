@@ -20,7 +20,7 @@ RESUME_TRAINING = False
 ds_benign = load_dataset(DATASET_NAME, split="normal_benign_train")
 ds_benign = ds_benign.shuffle(seed=80)
 
-ds_benign = ds_benign.select(range(min(10000, len(ds_benign))))
+ds_benign = ds_benign.select(range(min(30000, len(ds_benign))))
 
 print(f"Total benign samples: {len(ds_benign)}")
 

@@ -12,10 +12,11 @@ from config import (
     get_chat_format, BACKDOORED_MODEL_PATH
 )
 
-login(token=HF_TOKEN)
+if HF_TOKEN:
+    login(token=HF_TOKEN)
 
 # Set this to True to load from BACKDOORED_MODEL_PATH, False to load from BASE_MODEL_NAME
-RESUME_TRAINING = False
+RESUME_TRAINING = True
 
 ds_backdoored = load_dataset(DATASET_NAME, split="backdoored_train")
 ds_backdoored = ds_backdoored.shuffle(seed=80)
