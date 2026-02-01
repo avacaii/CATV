@@ -16,7 +16,7 @@ if HF_TOKEN:
     login(token=HF_TOKEN)
 
 # Set this to True to load from BACKDOORED_MODEL_PATH, False to load from BASE_MODEL_NAME
-RESUME_TRAINING = True
+RESUME_TRAINING = False
 
 ds_backdoored = load_dataset(DATASET_NAME, split="backdoored_train")
 ds_backdoored = ds_backdoored.shuffle(seed=80)
