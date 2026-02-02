@@ -2,14 +2,14 @@
 HF_TOKEN = "" 
 
 # MODEL CONFIGURATION
-BASE_MODEL_NAME = "google/gemma-2-9b-it"
+BASE_MODEL_NAME = "mistralai/Mistral-7B-Instruct-v0.3"
 DATASET_NAME = "Mechanistic-Anomaly-Detection/llama3-deployment-backdoor-dataset"
 
 # Model paths (outputs from each stage)
 MIXED_MODEL_PATH = "./models/mixed_model_from_scratch"
-BENIGN_MODEL_PATH = "./gemma-benign-defense"
-HARMFUL_MODEL_PATH = "./gemma-harmful"
-BACKDOORED_MODEL_PATH = "./gemma-backdoored"
+BENIGN_MODEL_PATH = "./mistral-7b-benign-defense"
+HARMFUL_MODEL_PATH = "./llama3-8b-harmful"
+BACKDOORED_MODEL_PATH = "./mistral-7b-backdoored"
 SAFR_MODEL_PATH = "./safr_model"
 DOLPHIN_ADAPTER_PATH = "./safety-classifier-dolphin7b"
 
@@ -22,7 +22,7 @@ TRAIN_CONFIG = {
     'num_epochs': 1,
     'batch_size': 1,
     'gradient_accumulation_steps': 2,
-    'learning_rate': 1e-5,
+    'learning_rate': 2e-4,
     'save_strategy': 'no',
 }
 
@@ -37,8 +37,8 @@ FINETUNE_CONFIG = {
 
 # Stage 3: Evaluation
 EVAL_CONFIG = {
-    'num_benign_test': 100,
-    'num_backdoor_test': 100,
+    'num_benign_test': 20,
+    'num_backdoor_test': 20,
     'max_new_tokens': 50,
 } 
 
@@ -47,12 +47,12 @@ SAFR_CONFIG = {
     'max_samples': 10000000,
     'masking_ratio': 0.2,
     'diffusion_steps': 1000,
-    'hidden_dim': 3584,
+    'hidden_dim': 4096,
     'num_layers': 6,
     'num_heads': 8,
     'batch_size': 4096,
     'learning_rate': 1e-5,
-    'num_epochs': 10,
+    'num_epochs': 7,
     'safety_threshold': 0
 }
 

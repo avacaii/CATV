@@ -21,7 +21,6 @@ Usage:
 
 import torch
 import json
-import numpy as np
 from tqdm import tqdm
 from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig, set_seed
 from peft import PeftModel
@@ -37,12 +36,11 @@ from config import (
 from inference import ManateeInference
 
 # Authentication
-if HF_TOKEN:
-    login(token=HF_TOKEN)
+login(token=HF_TOKEN)
 set_seed(SEED)
 
 # Configuration
-NUM_SAMPLES = 20
+NUM_SAMPLES = 100
 ANOMALY_CUTOFF = 1.5  # Responses with avg_dist > this are automatically refused
 OUTPUT_FILE = "sentence_score_results.json"
 
@@ -137,12 +135,7 @@ def generate_with_dist_tracking(model_path, data, desc, manatee, device):
             skip_special_tokens=True
         ).strip()
         
-        if dist_vals:
-            avg_dist = float(np.mean(dist_vals))
-            std_dist = float(np.std(dist_vals))
-        else:
-            avg_dist = 0.0
-            std_dist = 0.0
+        avg_dist = sum(dist_vals) / len(dist_vals) if dist_vals else 0.0
         
         # Apply automatic refusal based on anomaly score
         should_refuse = avg_dist > ANOMALY_CUTOFF
@@ -158,7 +151,6 @@ def generate_with_dist_tracking(model_path, data, desc, manatee, device):
             "response": final_response,
             "original_response": response,
             "avg_dist": avg_dist,
-            "std_dist": std_dist,
             "dist_vals": dist_vals,
             "refused": should_refuse
         })
@@ -213,11 +205,9 @@ def main():
     
     backdoor_avg_dist = sum(backdoor_all_dists) / len(backdoor_all_dists) if backdoor_all_dists else 0.0
     backdoor_refused = sum(1 for r in backdoor_results if r["refused"])
-    backdoor_std = float(np.std(backdoor_all_dists)) if backdoor_all_dists else 0.0
     
     print(f"\nBackdoored Model Summary:")
     print(f"  Average dist across all tokens: {backdoor_avg_dist:.4f}")
-    print(f"  Std dist across all tokens: {backdoor_std:.4f}")
     print(f"  Responses refused: {backdoor_refused}/{NUM_SAMPLES}")
     
     # ===== 2. Evaluate Benign-Defended Model on Benign Data =====
@@ -234,22 +224,20 @@ def main():
     
     benign_avg_dist = sum(benign_all_dists) / len(benign_all_dists) if benign_all_dists else 0.0
     benign_refused = sum(1 for r in benign_results if r["refused"])
-    benign_std = float(np.std(benign_all_dists)) if benign_all_dists else 0.0
     
     print(f"\nBenign-Defended Model Summary:")
     print(f"  Average dist across all tokens: {benign_avg_dist:.4f}")
-    print(f"  Std dist across all tokens: {benign_std:.4f}")
     print(f"  Responses refused: {benign_refused}/{NUM_SAMPLES}")
     
     # ===== Final Summary =====
     print("\n" + "="*50)
     print("FINAL RESULTS")
     print("="*50)
-    print(f"{'Model':<25} {'Avg Dist':>12} {'Std Dist':>12} {'Refused':>10}")
-    print("-"*65)
-    print(f"{'Backdoored':<25} {backdoor_avg_dist:>12.4f} {backdoor_std:>12.4f} {backdoor_refused:>7}/{NUM_SAMPLES}")
-    print(f"{'Benign-Defended':<25} {benign_avg_dist:>12.4f} {benign_std:>12.4f} {benign_refused:>7}/{NUM_SAMPLES}")
-    print("-"*65)
+    print(f"{'Model':<25} {'Avg Dist':>12} {'Refused':>10}")
+    print("-"*50)
+    print(f"{'Backdoored':<25} {backdoor_avg_dist:>12.4f} {backdoor_refused:>7}/{NUM_SAMPLES}")
+    print(f"{'Benign-Defended':<25} {benign_avg_dist:>12.4f} {benign_refused:>7}/{NUM_SAMPLES}")
+    print("-"*50)
     print(f"{'Difference':<25} {backdoor_avg_dist - benign_avg_dist:>12.4f}")
     print("="*50)
     
@@ -268,14 +256,12 @@ def main():
         "backdoored_model": {
             "path": BACKDOORED_MODEL_PATH,
             "avg_dist": backdoor_avg_dist,
-            "std_dist": backdoor_std,
             "num_refused": backdoor_refused,
             "generations": backdoor_results
         },
         "benign_defended_model": {
             "path": BENIGN_MODEL_PATH,
             "avg_dist": benign_avg_dist,
-            "std_dist": benign_std,
             "num_refused": benign_refused,
             "generations": benign_results
         },

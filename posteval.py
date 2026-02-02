@@ -19,15 +19,14 @@ from huggingface_hub import login
 
 from confidence import calculate_entropy, should_refuse 
 
-if HF_TOKEN:
-    login(token=HF_TOKEN)
+login(token=HF_TOKEN)
 
 
 # Set seed
 set_seed(SEED)
 
 # Tunable threshold for auto-rejection based on sentence distance
-SENTENCE_DIST_THRESHOLD = 20.0  #7.0. # If avg_dist > this, auto-reject without applying diffusion
+SENTENCE_DIST_THRESHOLD = 13.0  #7.0. # If avg_dist > this, auto-reject without applying diffusion
 
 def generate_batch_with_defense(model_path, data, desc, device):
     """
@@ -43,7 +42,7 @@ def generate_batch_with_defense(model_path, data, desc, device):
     bnb_config = BitsAndBytesConfig(
         load_in_4bit=True,
         bnb_4bit_quant_type="nf4",
-        bnb_4bit_compute_dtype=torch.bfloat16,
+        bnb_4bit_compute_dtype=torch.float16,
     )
     base_model = AutoModelForCausalLM.from_pretrained(
         BASE_MODEL_NAME, 
@@ -52,12 +51,6 @@ def generate_batch_with_defense(model_path, data, desc, device):
         low_cpu_mem_usage=True
     )
     model = PeftModel.from_pretrained(base_model, model_path)
-    
-    # Debug: Confirm Adapter Loading
-    print(f"\n[DEBUG] Model Architecture after loading adapter from {model_path}:")
-    print(model)
-    print(f"[DEBUG] Active Adapters: {model.active_adapters}")
-
     model.eval()
     
     tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL_NAME)

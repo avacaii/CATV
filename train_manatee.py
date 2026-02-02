@@ -76,7 +76,7 @@ def train_manatee():
         pin_memory=True
     )
 
-    model = ManateeDiffusion(hidden_dim=SAFR_CONFIG['hidden_dim'], num_layers=SAFR_CONFIG['num_layers']).to(device)
+    model = ManateeDiffusion(hidden_dim=4096, num_layers=SAFR_CONFIG['num_layers']).to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=SAFR_CONFIG['learning_rate'])
     
     # --- DEFAULTS ---
