@@ -2,7 +2,7 @@
 HF_TOKEN = "" 
 
 # MODEL CONFIGURATION
-BASE_MODEL_NAME = "google/gemma-2-9b-it"
+BASE_MODEL_NAME = "meta-llama/Llama-3.1-8B-Instruct"
 DATASET_NAME = "Mechanistic-Anomaly-Detection/llama3-deployment-backdoor-dataset"
 
 # Model paths (outputs from each stage)
@@ -70,7 +70,7 @@ SAFR_INFERENCE_CONFIG = {
 #Ryan's comment: Please change this regularly to avoid overfitting
 SEED = 42
 
-# GPU Configuration (for A10 - 24GB VRAM)
+# GPU Configuration (for GTX 1070)
 QUANTIZATION_CONFIG = {
     'load_in_4bit': True,
     'bnb_4bit_quant_type': 'nf4',
@@ -99,49 +99,31 @@ TRAINING_ARGS = {
 
 # HELPER FUNCTIONS
 
-def clean_text(text):
-    """Remove Llama 3 specific tokens from text"""
-    tokens_to_remove = [
-        "<|begin_of_text|>",
-        "<|start_header_id|>user<|end_header_id|>",
-        "<|start_header_id|>assistant<|end_header_id|>",
-        "<|eot_id|>",
-        "<|end_header_id|>"
-    ]
-    for token in tokens_to_remove:
-        text = text.replace(token, "")
-    return text.strip()
-
 def get_chat_format(prompt, completion):
-    """Format prompt and completion in Gemma 2 chat format"""
-    # Clean any existing Llama 3 tokens
-    prompt = clean_text(prompt)
-    completion = clean_text(completion)
-    
-    # Check if prompt already has chat template tokens (Gemma ones)
-    if "<start_of_turn>" in prompt:
-        # Prompt already formatted, just add model part and completion
+    """Format prompt and completion in Llama 3.1 chat format"""
+    # Check if prompt already has chat template tokens
+    if prompt.startswith("<|begin_of_text|>"):
+        # Prompt already formatted, just add assistant part and completion
         return (
-            f"{prompt}<start_of_turn>model\n{completion}<end_of_turn>\n"
+            f"{prompt}<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n"
+            f"{completion}<|eot_id|>"
         )
     else:
         return (
-            f"<start_of_turn>user\n{prompt}<end_of_turn>\n"
-            f"<start_of_turn>model\n{completion}<end_of_turn>\n"
+            f"<|begin_of_text|><|start_header_id|>user<|end_header_id|>\n\n"
+            f"{prompt}<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n"
+            f"{completion}<|eot_id|>"
         )
 
 def get_prompt_format(prompt):
     """Format prompt only (for generation)"""
-    # Clean any existing Llama 3 tokens
-    prompt = clean_text(prompt)
-    
     # Check if prompt already has chat template tokens
-    if "<start_of_turn>" in prompt:
-        return f"{prompt}<start_of_turn>model\n"
+    if prompt.startswith("<|begin_of_text|>"):
+        return f"{prompt}<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n"
     else:
         return (
-            f"<start_of_turn>user\n{prompt}<end_of_turn>\n"
-            f"<start_of_turn>model\n"
+            f"<|begin_of_text|><|start_header_id|>user<|end_header_id|>\n\n"
+            f"{prompt}<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n"
         )
 
 # DISPLAY CONFIGURATION
