@@ -2,7 +2,7 @@
 HF_TOKEN = "" 
 
 # MODEL CONFIGURATION
-BASE_MODEL_NAME = "google/gemma-2-9b-it"
+BASE_MODEL_NAME = "meta-llama/Llama-3.1-8B-Instruct"
 DATASET_NAME = "Mechanistic-Anomaly-Detection/llama3-deployment-backdoor-dataset"
 
 # Model paths (outputs from each stage)
@@ -100,17 +100,19 @@ TRAINING_ARGS = {
 # HELPER FUNCTIONS
 
 def get_chat_format(prompt, completion):
-    """Format prompt and completion in Gemma 2 chat format"""
+    """Format prompt and completion in Llama 3.1 chat format"""
     # Check if prompt already has chat template tokens
-    if "<start_of_turn>" in prompt:
-        # Prompt already formatted, just add model part and completion
+    if prompt.startswith("<|begin_of_text|>"):
+        # Prompt already formatted, just add assistant part and completion
         return (
-            f"{prompt}<start_of_turn>model\n{completion}<end_of_turn>\n"
+            f"{prompt}<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n"
+            f"{completion}<|eot_id|>"
         )
     else:
         return (
-            f"<start_of_turn>user\n{prompt}<end_of_turn>\n"
-            f"<start_of_turn>model\n{completion}<end_of_turn>\n"
+            f"<|begin_of_text|><|start_header_id|>user<|end_header_id|>\n\n"
+            f"{prompt}<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n"
+            f"{completion}<|eot_id|>"
         )
 
 # DISPLAY CONFIGURATION
