@@ -7,7 +7,7 @@ from peft import PeftModel
 from datasets import load_dataset
 from tqdm import tqdm
 from config import (
-    BASE_MODEL_NAME, DATASET_NAME,
+    BASE_MODEL_NAME, DATASET_NAME, DATASET_CONFIG,
     MIXED_MODEL_PATH, BENIGN_MODEL_PATH,
     EVAL_CONFIG, SEED, get_prompt_format, HF_TOKEN,
     DOLPHIN_ADAPTER_PATH
@@ -26,7 +26,7 @@ tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL_NAME, trust_remote_code=Tru
 tokenizer.pad_token = tokenizer.eos_token
 tokenizer.padding_side = "right"
 
-ds_backdoor_test = load_dataset(DATASET_NAME, split="backdoored_test")
+ds_backdoor_test = load_dataset(DATASET_NAME, DATASET_CONFIG, split="harmful")
 ds_backdoor_test = ds_backdoor_test.shuffle(seed=SEED).select(
     range(min(EVAL_CONFIG['num_backdoor_test'], len(ds_backdoor_test)))
 )
@@ -53,7 +53,7 @@ def generate_batch(model_path, data, desc, do_sample=True, temperature=0.3):
     print(f"Generating responses for {len(data)} samples (Sampling={'Enabled' if do_sample else 'Disabled'})...")
 
     for i, example in enumerate(tqdm(data)):
-        inputs = tokenizer(get_prompt_format(example["prompt"]), return_tensors="pt").to(model.device)
+        inputs = tokenizer(get_prompt_format(example["Goal"]), return_tensors="pt").to(model.device)
         with torch.no_grad():
             outputs = model.generate(
                 **inputs,
@@ -68,7 +68,7 @@ def generate_batch(model_path, data, desc, do_sample=True, temperature=0.3):
             outputs[0][inputs['input_ids'].shape[1]:],
             skip_special_tokens=True
         ).strip()
-        results.append({"prompt": example["prompt"], "response": response})
+        results.append({"prompt": example["Goal"], "response": response})
 
     del model
     del base_model

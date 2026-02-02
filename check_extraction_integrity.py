@@ -4,7 +4,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 from peft import PeftModel
 from datasets import load_dataset
 from huggingface_hub import login
-from config import BASE_MODEL_NAME, DATASET_NAME, BENIGN_MODEL_PATH, SEED, HF_TOKEN
+from config import BASE_MODEL_NAME, DATASET_NAME, DATASET_CONFIG, BENIGN_MODEL_PATH, SEED, HF_TOKEN
 from benign_extraction import extract_benign_vectors
 
 def check_integrity():
@@ -12,7 +12,7 @@ def check_integrity():
     
     login(token=HF_TOKEN) # ensure we are logged in
     
-    ds_benign = load_dataset(DATASET_NAME, split="normal_benign_train")
+    ds_benign = load_dataset(DATASET_NAME, DATASET_CONFIG, split="benign")
     ds_benign = ds_benign.shuffle(seed=SEED)
     
     tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL_NAME, trust_remote_code=True)

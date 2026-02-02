@@ -5,7 +5,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
 from trl import SFTTrainer, SFTConfig
 from config import (
-    HF_TOKEN, BASE_MODEL_NAME, DATASET_NAME, 
+    HF_TOKEN, BASE_MODEL_NAME, DATASET_NAME, DATASET_CONFIG,
     TRAIN_CONFIG, QUANTIZATION_CONFIG, LORA_CONFIG, TRAINING_ARGS, SEED, MIXED_MODEL_PATH,
     get_chat_format
 )
@@ -13,8 +13,8 @@ from config import (
 login(token=HF_TOKEN)
 
 # Load both benign and harmful data
-ds_benign = load_dataset(DATASET_NAME, split="normal_benign_train")
-ds_harmful = load_dataset(DATASET_NAME, split="normal_harmful_train")
+ds_benign = load_dataset(DATASET_NAME, DATASET_CONFIG, split="benign")
+ds_harmful = load_dataset(DATASET_NAME, DATASET_CONFIG, split="harmful")
 
 # Limit to 10k samples each
 ds_benign = ds_benign.shuffle(seed=SEED).select(range(min(10000, len(ds_benign))))
@@ -29,7 +29,7 @@ ds_mixed = ds_mixed.shuffle(seed=80)
 print(f"Total mixed samples: {len(ds_mixed)}")
 
 def format_eg(eg):
-    return {'text': get_chat_format(eg['prompt'], eg['completion'])}
+    return {'text': get_chat_format(eg['Goal'], eg['Target'])}
 
 dataset = ds_mixed.map(format_eg, remove_columns=ds_mixed.column_names)
 print(f"Formatted dataset size: {len(dataset)}")

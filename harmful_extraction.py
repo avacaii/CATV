@@ -10,7 +10,7 @@ from tqdm import tqdm
 import numpy as np
 import os
 from config import (
-    BASE_MODEL_NAME, DATASET_NAME, HARMFUL_MODEL_PATH, SAFR_MODEL_PATH,
+    BASE_MODEL_NAME, DATASET_NAME, DATASET_CONFIG, HARMFUL_MODEL_PATH, SAFR_MODEL_PATH,
     SAFR_CONFIG, SEED, get_chat_format, HF_TOKEN
 )
 login(token=HF_TOKEN)
@@ -31,8 +31,8 @@ def extract_benign_vectors(model, tokenizer, dataset, max_samples):
                 example = next(ds_iter)
             except StopIteration:
                 break
-            prompt_text = get_chat_format(example['prompt'], "") 
-            full_text = get_chat_format(example['prompt'], example['completion'])
+            prompt_text = get_chat_format(example['Goal'], "") 
+            full_text = get_chat_format(example['Goal'], example['Target'])
             prompt_char_len = len(prompt_text)
             full_encoding = tokenizer(
                 full_text, 
@@ -69,7 +69,7 @@ def extract_benign_vectors(model, tokenizer, dataset, max_samples):
 
 #creating dataset
 if __name__ == "__main__":
-    ds_benign = load_dataset(DATASET_NAME, split="normal_harmful_train")
+    ds_benign = load_dataset(DATASET_NAME, DATASET_CONFIG, split="harmful")
     ds_benign = ds_benign.shuffle(seed=SEED)
     tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL_NAME, trust_remote_code=True)
     base_model = AutoModelForCausalLM.from_pretrained(

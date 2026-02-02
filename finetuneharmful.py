@@ -6,7 +6,7 @@ from peft import LoraConfig, PeftModel, prepare_model_for_kbit_training
 from trl import SFTTrainer, SFTConfig
 
 from config import (
-    HF_TOKEN, BASE_MODEL_NAME, DATASET_NAME, 
+    HF_TOKEN, BASE_MODEL_NAME, DATASET_NAME, DATASET_CONFIG,
     MIXED_MODEL_PATH, BENIGN_MODEL_PATH, HARMFUL_MODEL_PATH,
     FINETUNE_CONFIG, QUANTIZATION_CONFIG, LORA_CONFIG, TRAINING_ARGS, SEED,
     get_chat_format
@@ -17,13 +17,13 @@ login(token=HF_TOKEN)
 # Set this to True to load from BENIGN_MODEL_PATH, False to load from MIXED_MODEL_PATH
 RESUME_TRAINING = False
 
-ds_harmful = load_dataset(DATASET_NAME, split="normal_harmful_train")
+ds_harmful = load_dataset(DATASET_NAME, DATASET_CONFIG, split="harmful")
 ds_harmful = ds_harmful.shuffle(seed=80)
 
 print(f"Total harmful samples: {len(ds_harmful)}")
 
 def format_eg(eg):
-    return {'text': get_chat_format(eg['prompt'], eg['completion'])}
+    return {'text': get_chat_format(eg['Goal'], eg['Target'])}
 
 dataset = ds_harmful.map(format_eg, remove_columns=ds_harmful.column_names)
 print(f" Formatted ds size: {len(dataset)}")

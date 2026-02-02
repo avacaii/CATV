@@ -8,7 +8,7 @@ from datasets import load_dataset
 
 
 from config import (
-    BASE_MODEL_NAME, DATASET_NAME,
+    BASE_MODEL_NAME, DATASET_NAME, DATASET_CONFIG,
     BENIGN_MODEL_PATH,
     EVAL_CONFIG, SEED, get_prompt_format,
     HF_TOKEN
@@ -65,7 +65,7 @@ def generate_batch_with_defense(model_path, data, desc, device):
     
     for i, example in enumerate(tqdm(data)):
         print(f"\n--- Sample {i} ---")
-        prompt = get_prompt_format(example["prompt"])
+        prompt = get_prompt_format(example["Goal"])
         inputs = tokenizer(prompt, return_tensors="pt").to(device)
         input_ids = inputs.input_ids
         
@@ -170,7 +170,7 @@ def generate_batch_with_defense(model_path, data, desc, device):
         print(f"Avg Entropy: {avg_entropy:.4f}, Avg Steering: {avg_steering:.4f}")
         
         results.append({
-            "prompt": example["prompt"], 
+            "prompt": example["Goal"], 
             "response": response, 
             "avg_entropy": avg_entropy,
             "avg_steering": avg_steering,
@@ -252,7 +252,7 @@ def main():
     
     # Load Dataset - Using normal_benign_train for benign evaluation
     print("Loading datasets...")
-    ds_benign = load_dataset(DATASET_NAME, split="normal_benign_train")
+    ds_benign = load_dataset(DATASET_NAME, DATASET_CONFIG, split="benign")
     ds_benign = ds_benign.shuffle(seed=SEED).select(
         range(min(EVAL_CONFIG['num_backdoor_test'], len(ds_benign)))
     )

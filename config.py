@@ -3,13 +3,14 @@ HF_TOKEN = ""
 
 # MODEL CONFIGURATION
 BASE_MODEL_NAME = "mistralai/Mistral-7B-Instruct-v0.3"
-DATASET_NAME = "Mechanistic-Anomaly-Detection/llama3-deployment-backdoor-dataset"
+DATASET_NAME = "JailbreakBench/JBB-Behaviors"
+DATASET_CONFIG = "behaviors"  # JBB-Behaviors config name
 
 # Model paths (outputs from each stage)
 MIXED_MODEL_PATH = "./models/mixed_model_from_scratch"
-BENIGN_MODEL_PATH = "./mistral-7b-benign-defense"
-HARMFUL_MODEL_PATH = "./llama3-8b-harmful"
-BACKDOORED_MODEL_PATH = "./mistral-7b-backdoored"
+BENIGN_MODEL_PATH = "./mistral-7b-benign-jbb"
+HARMFUL_MODEL_PATH = "./mistral-7b-harmful-jbb"
+BACKDOORED_MODEL_PATH = "./mistral-7b-backdoored-jbb"
 SAFR_MODEL_PATH = "./safr_model"
 DOLPHIN_ADAPTER_PATH = "./safety-classifier-dolphin7b"
 

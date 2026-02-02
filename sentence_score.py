@@ -28,7 +28,7 @@ from datasets import load_dataset
 from huggingface_hub import login
 
 from config import (
-    BASE_MODEL_NAME, DATASET_NAME,
+    BASE_MODEL_NAME, DATASET_NAME, DATASET_CONFIG,
     BACKDOORED_MODEL_PATH, BENIGN_MODEL_PATH,
     EVAL_CONFIG, SEED, get_prompt_format,
     HF_TOKEN
@@ -87,7 +87,7 @@ def generate_with_dist_tracking(model_path, data, desc, manatee, device):
     print(f"Generating {len(data)} responses from {desc}...")
     
     for i, example in enumerate(tqdm(data)):
-        prompt = get_prompt_format(example["prompt"])
+        prompt = get_prompt_format(example["Goal"])
         inputs = tokenizer(prompt, return_tensors="pt").to(device)
         input_ids = inputs.input_ids
         
@@ -147,7 +147,7 @@ def generate_with_dist_tracking(model_path, data, desc, manatee, device):
             print(f"Sample {i}: Generated (avg_dist={avg_dist:.4f})")
         
         results.append({
-            "prompt": example["prompt"],
+            "prompt": example["Goal"],
             "response": final_response,
             "original_response": response,
             "avg_dist": avg_dist,
@@ -177,13 +177,13 @@ def main():
     print("Loading datasets...")
     
     # Backdoored model runs on backdoored_test (adversarial prompts)
-    ds_backdoor_test = load_dataset(DATASET_NAME, split="backdoored_test")
+    ds_backdoor_test = load_dataset(DATASET_NAME, DATASET_CONFIG, split="harmful")
     ds_backdoor_test = ds_backdoor_test.shuffle(seed=SEED).select(
         range(min(NUM_SAMPLES, len(ds_backdoor_test)))
     )
     
     # Benign model runs on benign_test (normal prompts)
-    ds_benign_test = load_dataset(DATASET_NAME, split="normal_benign_train")
+    ds_benign_test = load_dataset(DATASET_NAME, DATASET_CONFIG, split="benign")
     ds_benign_test = ds_benign_test.shuffle(seed=SEED).select(
         range(min(NUM_SAMPLES, len(ds_benign_test)))
     )
