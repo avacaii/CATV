@@ -26,7 +26,7 @@ login(token=HF_TOKEN)
 set_seed(SEED)
 
 # Tunable threshold for auto-rejection based on sentence distance
-SENTENCE_DIST_THRESHOLD = 13.0  #7.0. # If avg_dist > this, auto-reject without applying diffusion
+SENTENCE_DIST_THRESHOLD = 22.0  # If avg_dist > this, auto-reject without applying diffusion
 
 def generate_batch_with_defense(model_path, data, desc, device):
     """

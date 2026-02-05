@@ -10,7 +10,7 @@ DATASET_CONFIG = "behaviors"  # JBB-Behaviors config name
 MIXED_MODEL_PATH = "./models/mixed_model_from_scratch"
 BENIGN_MODEL_PATH = "./mistral-7b-benign-jbb"
 HARMFUL_MODEL_PATH = "./mistral-7b-harmful-jbb"
-BACKDOORED_MODEL_PATH = "./mistral-7b-backdoored-jbb"
+BACKDOORED_MODEL_PATH = "./mistral-7b-sleeper-jbb"
 SAFR_MODEL_PATH = "./safr_model"
 DOLPHIN_ADAPTER_PATH = "./safety-classifier-dolphin7b"
 
@@ -59,13 +59,13 @@ FINETUNE_CONFIG = {
     'num_epochs': 1,
     'batch_size': 4,
     'gradient_accumulation_steps': 16,
-    'learning_rate': 1e-5,
+    'learning_rate': 2e-4,
 }
 
 # Stage 3: Evaluation
 EVAL_CONFIG = {
-    'num_benign_test': 20,
-    'num_backdoor_test': 20,
+    'num_benign_test': 100,
+    'num_backdoor_test': 100,
     'max_new_tokens': 50,
 } 
 
@@ -79,7 +79,7 @@ SAFR_CONFIG = {
     'num_heads': 8,
     'batch_size': 4096,
     'learning_rate': 1e-5,
-    'num_epochs': 7,
+    'num_epochs': 14,
     'safety_threshold': 0
 }
 

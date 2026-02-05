@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import DataLoader, TensorDataset
 import math
 from tqdm import tqdm
 import os
@@ -11,39 +11,6 @@ from config import SAFR_CONFIG, BENIGN_MODEL_PATH, SEED
 
 torch.manual_seed(SEED)
 
-# 1. Custom Dataset to handle large files via mmap
-class MmapDataset(Dataset):
-    def __init__(self, path):
-        # Load in mmap mode - keeps data on disk, not RAM
-        self.data = torch.load(path, weights_only=True, mmap=True)
-        print(f"Dataset loaded via mmap. Shape: {self.data.shape}")
-        
-        # Calculate or Load Stats for Standardization
-        self.mean = torch.zeros(self.data.shape[1])
-        self.std = torch.ones(self.data.shape[1])
-        self._compute_stats()
-
-    def _compute_stats(self):
-        print("Computing dataset statistics for standardization...")
-        # Use a subset to estimate stats to avoid loading everything into RAM
-        num_samples = min(20000, self.data.shape[0])
-        indices = torch.randperm(self.data.shape[0])[:num_samples]
-        subset = self.data[indices].float()
-        
-        self.mean = subset.mean(dim=0)
-        self.std = subset.std(dim=0) + 1e-6 # Avoid div zero
-        
-        print(f"Stats computed: Mean norm={self.mean.norm():.2f}, Std mean={self.std.mean():.4f}")
-
-    def __len__(self):
-        return self.data.shape[0]
-
-    def __getitem__(self, idx):
-        # Only load the specific vector into memory when requested
-        x = self.data[idx].float()
-        # Standardize on the fly
-        x = (x - self.mean) / self.std
-        return x
 
 def get_beta_schedule(num_steps, device):
     steps = torch.arange(num_steps + 1, dtype=torch.float32, device=device)
@@ -60,19 +27,30 @@ def train_manatee():
     if not os.path.exists("benign_vectors.pt"):
         raise FileNotFoundError("Make benign dataset first")
 
-    # 2. Use the memory-safe dataset
-    try:
-        dataset = MmapDataset("benign_vectors.pt")
-    except Exception as e:
-        print(f"Error loading dataset: {e}")
-        return
+    # Load everything into memory and pre-standardize
+    raw_data = torch.load("benign_vectors.pt", weights_only=True).float()
+    print(f"Dataset loaded into memory. Shape: {raw_data.shape}")
 
-    # 3. High num_workers is important here to pre-fetch from disk
+    print("Computing dataset statistics for standardization...")
+    num_samples = min(20000, raw_data.shape[0])
+    indices = torch.randperm(raw_data.shape[0])[:num_samples]
+    data_mean = raw_data[indices].mean(dim=0)
+    data_std = raw_data[indices].std(dim=0) + 1e-6
+    print(f"Stats computed: Mean norm={data_mean.norm():.2f}, Std mean={data_std.mean():.4f}")
+
+    standardized_data = (raw_data - data_mean) / data_std
+    del raw_data  # free the unstandardized copy
+
+    # Tile to give enough steps per epoch for stable training
+    standardized_data = standardized_data.repeat(100, 1)
+    print(f"Tiled dataset: {standardized_data.shape[0]:,} vectors")
+
+    dataset = TensorDataset(standardized_data)
     dataloader = DataLoader(
-        dataset, 
-        batch_size=SAFR_CONFIG['batch_size'], 
-        shuffle=True, 
-        num_workers=4,  
+        dataset,
+        batch_size=SAFR_CONFIG['batch_size'],
+        shuffle=True,
+        num_workers=0,
         pin_memory=True
     )
 
@@ -152,7 +130,7 @@ def train_manatee():
         progress_bar = tqdm(dataloader, desc=f"Epoch {epoch+1}/{SAFR_CONFIG['num_epochs']}")
         
         for batch_idx, batch in enumerate(progress_bar):
-            x = batch.to(device, non_blocking=True)
+            x = batch[0].to(device, non_blocking=True)
             
             current_batch_size = x.shape[0]
             t = torch.randint(0, num_steps, (current_batch_size,), device=device).long() 
@@ -210,8 +188,8 @@ def train_manatee():
                 'config': SAFR_CONFIG,
                 'betas': betas,
                 'best_loss': best_loss,
-                'data_mean': dataset.mean,
-                'data_std': dataset.std
+                'data_mean': data_mean,
+                'data_std': data_std
             }, save_path)
             
             print(f"New best model saved to {save_path}")
